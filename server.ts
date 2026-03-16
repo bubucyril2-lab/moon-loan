@@ -16,20 +16,23 @@ const JWT_SECRET = process.env.JWT_SECRET || 'moonstone-secret-key-2026';
 const PORT = 3000;
 
 export const app = express();
-const httpServer = createServer(app);
-const io = new Server(httpServer, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-});
+
+// Socket.io will be initialized only when running as a standalone server
+let io: any = null;
+let httpServer: any = null;
 
 app.use(express.json());
 
-// Ensure uploads directory exists
-const uploadDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
+// Ensure uploads directory exists (only if not on Vercel)
+const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL;
+const uploadDir = isVercel ? '/tmp' : path.join(process.cwd(), 'uploads');
+
+if (!isVercel && !fs.existsSync(uploadDir)) {
+  try {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  } catch (err) {
+    console.warn('Could not create uploads directory:', err);
+  }
 }
 
 // Configure multer
@@ -1047,51 +1050,6 @@ app.post('/api/auth/register', upload.single('profilePicture'), async (req: any,
     res.json({ imageUrl });
   });
 
-  // --- Chat Socket ---
-  io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
-
-    socket.on('join', (userId) => {
-      socket.join(`user_${userId}`);
-    });
-
-    socket.on('send_message', async (data) => {
-      const { senderId, receiverId, message } = data;
-      
-      try {
-        const { data: chatMessage, error } = await supabase
-          .from('chat_messages')
-          .insert({
-            sender_id: senderId,
-            receiver_id: receiverId,
-            message
-          })
-          .select()
-          .single();
-        
-        if (error) throw error;
-
-        const newMessage = {
-          id: chatMessage.id,
-          senderId,
-          receiverId,
-          message,
-          createdAt: chatMessage.created_at,
-          readStatus: chatMessage.read_status
-        };
-
-        io.to(`user_${receiverId}`).emit('receive_message', newMessage);
-        socket.emit('message_sent', newMessage);
-      } catch (error) {
-        console.error('Socket send_message error:', error);
-      }
-    });
-
-    socket.on('disconnect', () => {
-      console.log('User disconnected');
-    });
-  });
-
   app.get('/api/chat/history/:userId', authenticateToken, async (req: any, res) => {
     const otherId = req.params.userId;
     const myId = req.user.id;
@@ -1134,6 +1092,61 @@ app.post('/api/auth/register', upload.single('profilePicture'), async (req: any,
   });
 
 async function startServer() {
+  httpServer = createServer(app);
+  io = new Server(httpServer, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
+
+  // --- Chat Socket ---
+  io.on('connection', (socket: any) => {
+    console.log('User connected:', socket.id);
+
+    socket.on('join', (userId: any) => {
+      socket.join(`user_${userId}`);
+    });
+
+    socket.on('send_message', async (data: any) => {
+      const { senderId, receiverId, message } = data;
+      
+      try {
+        const { data: chatMessage, error } = await supabase
+          .from('chat_messages')
+          .insert({
+            sender_id: senderId,
+            receiver_id: receiverId,
+            message
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+
+        const newMessage = {
+          id: chatMessage.id,
+          senderId,
+          receiverId,
+          message,
+          createdAt: chatMessage.created_at,
+          readStatus: chatMessage.read_status
+        };
+
+        if (io) {
+          io.to(`user_${receiverId}`).emit('receive_message', newMessage);
+        }
+        socket.emit('message_sent', newMessage);
+      } catch (error) {
+        console.error('Socket send_message error:', error);
+      }
+    });
+
+    socket.on('disconnect', () => {
+      console.log('User disconnected');
+    });
+  });
+
   // --- Vite Middleware ---
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
