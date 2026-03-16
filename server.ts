@@ -1,16 +1,16 @@
 import express from 'express';
 import { createServer } from 'http';
-import { Server } from 'socket.io';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { supabase } from './server/supabase.js';
+import { supabase } from './server/supabase';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import fs from 'fs';
 
-dotenv.config();
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  dotenv.config();
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'moonstone-secret-key-2026';
 const PORT = 3000;
@@ -1092,6 +1092,7 @@ app.post('/api/auth/register', upload.single('profilePicture'), async (req: any,
   });
 
 async function startServer() {
+  const { Server } = await import('socket.io');
   httpServer = createServer(app);
   io = new Server(httpServer, {
     cors: {
@@ -1149,6 +1150,7 @@ async function startServer() {
 
   // --- Vite Middleware ---
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
