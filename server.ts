@@ -15,93 +15,92 @@ dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET || 'moonstone-secret-key-2026';
 const PORT = 3000;
 
-async function startServer() {
-  const app = express();
-  const httpServer = createServer(app);
-  const io = new Server(httpServer, {
-    cors: {
-      origin: "*",
-      methods: ["GET", "POST"]
-    }
-  });
-
-  app.use(express.json());
-
-  // Ensure uploads directory exists
-  const uploadDir = path.join(process.cwd(), 'uploads');
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir);
+export const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
   }
+});
 
-  // Configure multer
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-  });
-  const upload = multer({ storage });
+app.use(express.json());
 
-  // Serve uploads statically
-  app.use('/uploads', express.static(uploadDir));
+// Ensure uploads directory exists
+const uploadDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
 
-  // --- Middleware ---
-  const authenticateToken = (req: any, res: any, next: any) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+// Configure multer
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const upload = multer({ storage });
 
-    if (!token) return res.status(401).json({ error: 'Access denied' });
+// Serve uploads statically
+app.use('/uploads', express.static(uploadDir));
 
-    jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-      if (err) return res.status(403).json({ error: 'Invalid token' });
-      req.user = user;
-      next();
-    });
-  };
+// --- Middleware ---
+const authenticateToken = (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-  const isAdmin = (req: any, res: any, next: any) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+  if (!token) return res.status(401).json({ error: 'Access denied' });
+
+  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+    if (err) return res.status(403).json({ error: 'Invalid token' });
+    req.user = user;
     next();
-  };
-
-  // --- Debug/Emergency Routes ---
-  app.get('/api/debug/reset-admin', async (req, res) => {
-    try {
-      const hashedPassword = bcrypt.hashSync('admin', 10);
-      const { data, error } = await supabase
-        .from('users')
-        .update({ password: hashedPassword, status: 'active', role: 'admin' })
-        .eq('email', 'admin12345')
-        .select();
-
-      if (error) throw error;
-      
-      if (!data || data.length === 0) {
-        // If user doesn't exist, create them
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert({
-            email: 'admin12345',
-            password: hashedPassword,
-            full_name: 'System Admin',
-            role: 'admin',
-            status: 'active'
-          });
-        if (insertError) throw insertError;
-        return res.json({ message: 'Admin user created and password set to "admin"' });
-      }
-
-      res.json({ message: 'Admin password reset successfully to "admin"' });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
   });
+};
 
-  // --- Auth Routes ---
-  app.post('/api/auth/register', upload.single('profilePicture'), async (req: any, res) => {
+const isAdmin = (req: any, res: any, next: any) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+  next();
+};
+
+// --- Debug/Emergency Routes ---
+app.get('/api/debug/reset-admin', async (req, res) => {
+  try {
+    const hashedPassword = bcrypt.hashSync('admin', 10);
+    const { data, error } = await supabase
+      .from('users')
+      .update({ password: hashedPassword, status: 'active', role: 'admin' })
+      .eq('email', 'admin12345')
+      .select();
+
+    if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      // If user doesn't exist, create them
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert({
+          email: 'admin12345',
+          password: hashedPassword,
+          full_name: 'System Admin',
+          role: 'admin',
+          status: 'active'
+        });
+      if (insertError) throw insertError;
+      return res.json({ message: 'Admin user created and password set to "admin"' });
+    }
+
+    res.json({ message: 'Admin password reset successfully to "admin"' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Auth Routes ---
+app.post('/api/auth/register', upload.single('profilePicture'), async (req: any, res) => {
     console.log('Registration request received:', req.body.email);
     const { email, password, fullName, country, city, age } = req.body;
     const profilePicture = req.file ? `/uploads/${req.file.filename}` : null;
@@ -1134,6 +1133,7 @@ async function startServer() {
     });
   });
 
+async function startServer() {
   // --- Vite Middleware ---
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -1154,4 +1154,7 @@ async function startServer() {
   });
 }
 
-startServer();
+// Only start the server if this file is run directly
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  startServer().catch(console.error);
+}
