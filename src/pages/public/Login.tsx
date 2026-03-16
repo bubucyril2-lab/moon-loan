@@ -151,19 +151,7 @@ const Login = () => {
             </div>
           </form>
 
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-slate-500">Admin Credentials</span>
-              </div>
-            </div>
-            <div className="mt-4 text-center text-xs text-slate-400">
-              Username: admin12345 | Password: admin
-            </div>
-          </div>
+          
         </div>
       </div>
     </div>

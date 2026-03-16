@@ -70,11 +70,11 @@ async function startServer() {
   // --- Debug/Emergency Routes ---
   app.get('/api/debug/reset-admin', async (req, res) => {
     try {
-      const hashedPassword = bcrypt.hashSync('admin12345', 10);
+      const hashedPassword = bcrypt.hashSync('admin', 10);
       const { data, error } = await supabase
         .from('users')
         .update({ password: hashedPassword, status: 'active', role: 'admin' })
-        .eq('email', 'admin@gmail.com')
+        .eq('email', 'admin12345')
         .select();
 
       if (error) throw error;
@@ -84,17 +84,17 @@ async function startServer() {
         const { error: insertError } = await supabase
           .from('users')
           .insert({
-            email: 'admin@gmail.com',
+            email: 'admin12345',
             password: hashedPassword,
             full_name: 'System Admin',
             role: 'admin',
             status: 'active'
           });
         if (insertError) throw insertError;
-        return res.json({ message: 'Admin user created and password set to admin12345' });
+        return res.json({ message: 'Admin user created and password set to "admin"' });
       }
 
-      res.json({ message: 'Admin password reset successfully to admin12345' });
+      res.json({ message: 'Admin password reset successfully to "admin"' });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
