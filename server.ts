@@ -1,9 +1,10 @@
 import express from 'express';
+import cors from 'cors';
 import { createServer } from 'http';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { supabase } from './server/supabase';
+import { supabase, isConfigured } from './server/supabase';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import fs from 'fs';
@@ -17,11 +18,12 @@ const PORT = 3000;
 
 export const app = express();
 
+app.use(cors());
+app.use(express.json());
+
 // Socket.io will be initialized only when running as a standalone server
 let io: any = null;
 let httpServer: any = null;
-
-app.use(express.json());
 
 // Ensure uploads directory exists (only if not on Vercel)
 const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL;
@@ -104,6 +106,9 @@ app.get('/api/debug/reset-admin', async (req, res) => {
 
 // --- Auth Routes ---
 app.post('/api/auth/register', upload.single('profilePicture'), async (req: any, res) => {
+    if (!isConfigured) {
+      return res.status(500).json({ error: 'Supabase is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your environment variables.' });
+    }
     console.log('Registration request received:', req.body.email);
     const { email, password, fullName, country, city, age } = req.body;
     const profilePicture = req.file ? `/uploads/${req.file.filename}` : null;
@@ -147,6 +152,9 @@ app.post('/api/auth/register', upload.single('profilePicture'), async (req: any,
   });
 
   app.post('/api/auth/login', async (req, res) => {
+    if (!isConfigured) {
+      return res.status(500).json({ error: 'Supabase is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your environment variables.' });
+    }
     const { email, password } = req.body;
     console.log(`Login attempt for: ${email}`);
     

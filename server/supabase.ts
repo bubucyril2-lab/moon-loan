@@ -12,8 +12,9 @@ if (!supabaseUrl || !supabaseServiceKey) {
   console.error('CRITICAL: Supabase credentials missing. The application will not function correctly.');
 }
 
+export const isConfigured = !!supabaseUrl && !!supabaseServiceKey;
+
 // Initialize with placeholders if missing to prevent immediate crash on import
-// but it will still fail when used.
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseServiceKey || 'placeholder-key',
