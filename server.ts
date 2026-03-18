@@ -4,7 +4,7 @@ import { createServer } from 'http';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { supabase, isConfigured } from './server/supabase';
+import { supabase, isConfigured } from './server/supabase.js';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import fs from 'fs';
