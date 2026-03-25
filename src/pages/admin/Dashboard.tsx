@@ -34,19 +34,21 @@ import {
   ResponsiveContainer 
 } from 'recharts';
 import { motion } from 'motion/react';
+import { storageService, AuditLog } from '../../services/storage';
 
 interface AdminStats {
   totalCustomers: number;
   pendingApprovals: number;
   activeAccounts: number;
   totalSystemBalance: number;
+  pinsNotSet: number;
 }
 
 const AdminDashboard = () => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [growthData, setGrowthData] = useState<any[]>([]);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [isBroadcasting, setIsBroadcasting] = useState(false);
@@ -54,19 +56,37 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, growthRes, logsRes] = await Promise.all([
-          fetch('/api/admin/stats', { headers: { Authorization: `Bearer ${token}` } }),
-          fetch('/api/admin/stats/growth', { headers: { Authorization: `Bearer ${token}` } }),
-          fetch('/api/admin/audit-logs', { headers: { Authorization: `Bearer ${token}` } })
-        ]);
+        const users = await storageService.getUsers();
+        const accounts = await storageService.getAccounts();
+        const logs = await storageService.getAuditLogs();
 
-        const statsData = await statsRes.json();
-        const growthData = await growthRes.json();
-        const logsData = await logsRes.json();
+        const customers = users.filter(u => u.role === 'customer');
+        const pending = customers.filter(u => u.status === 'pending').length;
+        const active = accounts.filter(a => a.status === 'active').length;
+        const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+        const pinsNotSetCount = accounts.filter(a => !a.pin).length;
 
-        setStats(statsData);
-        setGrowthData(growthData);
-        setAuditLogs(logsData);
+        setStats({
+          totalCustomers: customers.length,
+          pendingApprovals: pending,
+          activeAccounts: active,
+          totalSystemBalance: totalBalance,
+          pinsNotSet: pinsNotSetCount
+        });
+
+        // Mock growth data based on transactions
+        const transactions = await storageService.getTransactions();
+        const last7Days = Array.from({ length: 7 }, (_, i) => {
+          const date = new Date();
+          date.setDate(date.getDate() - (6 - i));
+          const dateStr = date.toISOString().split('T')[0];
+          const dayTotal = transactions
+            .filter(t => (t.createdAt || t.created_at || '').startsWith(dateStr))
+            .reduce((sum, t) => sum + (t.type === 'credit' ? t.amount : -t.amount), totalBalance);
+          return { date: format(date, 'MMM dd'), total: dayTotal };
+        });
+        setGrowthData(last7Days);
+        setAuditLogs(logs);
       } catch (error) {
         toast.error('Failed to load dashboard data');
       } finally {
@@ -74,25 +94,43 @@ const AdminDashboard = () => {
       }
     };
     fetchData();
-  }, [token]);
+  }, []);
 
   const handleBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!broadcastMessage.trim()) return;
+    if (!broadcastMessage.trim() || !user) return;
     setIsBroadcasting(true);
     try {
-      const res = await fetch('/api/admin/broadcast', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ message: broadcastMessage })
+      const users = await storageService.getUsers();
+      const notificationPromises = users.map(u => 
+        storageService.saveNotification({
+          id: Math.random().toString(36).substr(2, 9),
+          userId: u.id,
+          title: 'System Announcement',
+          message: broadcastMessage,
+          type: 'info',
+          read: false,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+          created_at: new Date().toISOString()
+        })
+      );
+      await Promise.all(notificationPromises);
+
+      await storageService.saveAuditLog({
+        id: Math.random().toString(36).substr(2, 9),
+        adminId: user.id,
+        adminName: user.fullName || user.full_name || '',
+        action: 'broadcast_message',
+        details: broadcastMessage,
+        createdAt: new Date().toISOString()
       });
-      if (res.ok) {
-        toast.success('Broadcast sent successfully');
-        setBroadcastMessage('');
-      }
+
+      toast.success('Broadcast sent successfully');
+      setBroadcastMessage('');
+      // Refresh logs
+      const updatedLogs = await storageService.getAuditLogs();
+      setAuditLogs(updatedLogs);
     } catch (error) {
       toast.error('Failed to send broadcast');
     } finally {
@@ -106,6 +144,7 @@ const AdminDashboard = () => {
     { label: 'Total Customers', value: stats?.totalCustomers || 0, icon: Users, color: 'bg-blue-500' },
     { label: 'Pending Approvals', value: stats?.pendingApprovals || 0, icon: UserCheck, color: 'bg-amber-500' },
     { label: 'Active Accounts', value: stats?.activeAccounts || 0, icon: Activity, color: 'bg-emerald-500' },
+    { label: 'PINs Not Set', value: stats?.pinsNotSet || 0, icon: ShieldAlert, color: 'bg-red-500' },
     { label: 'System Balance', value: `$${(stats?.totalSystemBalance || 0).toLocaleString()}`, icon: DollarSign, color: 'bg-slate-900' },
   ];
 
@@ -153,6 +192,10 @@ const AdminDashboard = () => {
           <Link to="/admin/customers" className="flex flex-col items-center justify-center p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-emerald-50 hover:border-emerald-100 transition-all group">
             <Users className="h-8 w-8 text-slate-600 group-hover:text-emerald-600 mb-3" />
             <span className="text-sm font-bold text-slate-600 group-hover:text-emerald-600">Manage Users</span>
+          </Link>
+          <Link to="/admin/customers" className="flex flex-col items-center justify-center p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-red-50 hover:border-red-100 transition-all group">
+            <Shield className="h-8 w-8 text-slate-600 group-hover:text-red-600 mb-3" />
+            <span className="text-sm font-bold text-slate-600 group-hover:text-red-600">Reset PINs</span>
           </Link>
           <Link to="/admin/transactions" className="flex flex-col items-center justify-center p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-blue-50 hover:border-blue-100 transition-all group">
             <ArrowRightLeft className="h-8 w-8 text-slate-600 group-hover:text-blue-600 mb-3" />
@@ -284,7 +327,7 @@ const AdminDashboard = () => {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-slate-900 font-medium truncate capitalize">{log.action.replace(/_/g, ' ')}</p>
-                  <p className="text-[10px] text-slate-500">{log.admin_name} • {safeFormat(log.created_at, 'HH:mm')}</p>
+                  <p className="text-[10px] text-slate-500">{log.adminName} • {safeFormat(log.createdAt, 'HH:mm')}</p>
                 </div>
               </div>
             ))}

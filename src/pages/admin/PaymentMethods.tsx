@@ -24,12 +24,14 @@ interface PaymentMethod {
   created_at: string;
 }
 
+import { storageService } from '../../services/storage';
+
 const AdminPaymentMethods = () => {
-  const { token } = useAuth();
-  const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const { user } = useAuth();
+  const [methods, setMethods] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
+  const [editingMethod, setEditingMethod] = useState<any | null>(null);
   
   const [formData, setFormData] = useState({
     type: 'bank' as 'bank' | 'crypto',
@@ -41,10 +43,7 @@ const AdminPaymentMethods = () => {
 
   const fetchMethods = async () => {
     try {
-      const res = await fetch('/api/admin/payment-methods', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
+      const data = await storageService.getPaymentMethods();
       setMethods(data);
     } catch (error) {
       toast.error('Failed to fetch payment methods');
@@ -59,28 +58,19 @@ const AdminPaymentMethods = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const url = editingMethod 
-      ? `/api/admin/payment-methods/${editingMethod.id}`
-      : '/api/admin/payment-methods';
-    const method = editingMethod ? 'PUT' : 'POST';
-
     try {
-      const res = await fetch(url, {
-        method,
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify(formData)
-      });
+      const methodToSave = {
+        ...formData,
+        id: editingMethod ? editingMethod.id : Date.now().toString(),
+        created_at: editingMethod ? editingMethod.created_at : new Date().toISOString()
+      };
 
-      if (res.ok) {
-        toast.success(editingMethod ? 'Payment method updated' : 'Payment method added');
-        setShowModal(false);
-        setEditingMethod(null);
-        setFormData({ type: 'bank', name: '', details: '', instructions: '', is_active: 1 });
-        fetchMethods();
-      }
+      await storageService.savePaymentMethod(methodToSave);
+      toast.success(editingMethod ? 'Payment method updated' : 'Payment method added');
+      setShowModal(false);
+      setEditingMethod(null);
+      setFormData({ type: 'bank', name: '', details: '', instructions: '', is_active: 1 });
+      fetchMethods();
     } catch (error) {
       toast.error('Operation failed');
     }
@@ -90,15 +80,9 @@ const AdminPaymentMethods = () => {
     if (!confirm('Are you sure you want to delete this payment method?')) return;
 
     try {
-      const res = await fetch(`/api/admin/payment-methods/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (res.ok) {
-        toast.success('Payment method deleted');
-        fetchMethods();
-      }
+      await storageService.deletePaymentMethod(id);
+      toast.success('Payment method deleted');
+      fetchMethods();
     } catch (error) {
       toast.error('Delete failed');
     }

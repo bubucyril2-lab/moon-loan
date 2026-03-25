@@ -96,8 +96,10 @@ const LoanCalculator = ({ interestRate }: { interestRate: number }) => {
   );
 };
 
+import { storageService } from '../../services/storage';
+
 const CustomerLoans = () => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [loans, setLoans] = useState<Loan[]>([]);
   const [amount, setAmount] = useState('');
@@ -105,7 +107,7 @@ const CustomerLoans = () => {
   const [repaymentSchedule, setRepaymentSchedule] = useState('Monthly');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [hasPaidFee, setHasPaidFee] = useState(false);
@@ -114,35 +116,21 @@ const CustomerLoans = () => {
   const depositFee = amount ? (parseFloat(amount) * (depositFeePercent / 100)) : 0;
 
   const fetchLoans = async () => {
-    try {
-      const res = await fetch('/api/customer/loans', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setLoans(data);
-    } catch (error) {
-      toast.error('Failed to fetch loans');
-    } finally {
-      setIsLoading(false);
-    }
+    if (!user) return;
+    const allLoans = await storageService.getLoans();
+    setLoans(allLoans.filter(l => l.userId === user.id).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+    setIsLoading(false);
   };
 
   const fetchPaymentMethods = async () => {
-    try {
-      const res = await fetch('/api/customer/payment-methods', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setPaymentMethods(data);
-    } catch (error) {
-      console.error('Failed to fetch payment methods');
-    }
+    const data = await storageService.getPaymentMethods();
+    setPaymentMethods(data);
   };
 
   useEffect(() => {
     fetchLoans();
     fetchPaymentMethods();
-  }, [token]);
+  }, [user]);
 
   const handleApplyClick = (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,36 +142,56 @@ const CustomerLoans = () => {
   };
 
   const confirmSubmission = async () => {
-    if (!hasPaidFee) {
+    if (!hasPaidFee || !user) {
       toast.error('Please confirm that you have paid the deposit fee');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/customer/loans', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({
-          amount: parseFloat(amount),
-          interestRate,
-          repaymentSchedule
-        })
+      const newLoan: Loan = {
+        id: Math.random().toString(36).substr(2, 9),
+        userId: user.id,
+        amount: parseFloat(amount),
+        interestRate: interestRate,
+        interest_rate: interestRate,
+        status: 'pending',
+        repaymentSchedule: repaymentSchedule,
+        repayment_schedule: repaymentSchedule,
+        paidAmount: 0,
+        paid_amount: 0,
+        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      };
+
+      await storageService.saveLoan(newLoan);
+
+      await storageService.saveNotification({
+        id: Math.random().toString(36).substr(2, 9),
+        userId: user.id,
+        title: 'Loan Application Submitted',
+        message: `Your loan application for $${parseFloat(amount).toLocaleString()} has been received and is under review.`,
+        type: 'info',
+        isRead: false,
+        read: false,
+        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString()
       });
 
-      if (res.ok) {
-        toast.success('Loan application submitted!');
-        setAmount('');
-        setShowReviewModal(false);
-        setHasPaidFee(false);
-        fetchLoans();
-      } else {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to submit application');
-      }
+      await storageService.saveAuditLog({
+        id: Math.random().toString(36).substr(2, 9),
+        adminId: 'system',
+        adminName: 'System',
+        action: 'LOAN_APPLIED',
+        details: `User ${user.email} applied for a loan of $${parseFloat(amount).toLocaleString()}`,
+        createdAt: new Date().toISOString()
+      });
+
+      toast.success('Loan application submitted!');
+      setAmount('');
+      setShowReviewModal(false);
+      setHasPaidFee(false);
+      await fetchLoans();
     } catch (error: any) {
       toast.error(error.message);
     } finally {

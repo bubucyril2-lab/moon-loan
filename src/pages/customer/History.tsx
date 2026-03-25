@@ -16,8 +16,10 @@ import { safeDate, safeFormat } from '../../utils/date';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
+import { storageService } from '../../services/storage';
+
 const CustomerHistory = () => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,29 +28,30 @@ const CustomerHistory = () => {
 
   useEffect(() => {
     const fetchTransactions = async () => {
-      const res = await fetch('/api/customer/transactions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setTransactions(data);
+      if (!user) return;
+      const account = await storageService.getAccountByUserId(user.id);
+      if (account) {
+        const txs = await storageService.getTransactionsByAccountId(account.id);
+        setTransactions(txs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      }
       setIsLoading(false);
     };
     fetchTransactions();
-  }, [token]);
+  }, [user]);
 
-  const handleExport = async () => {
+  const handleExport = () => {
     try {
-      const res = await fetch('/api/customer/transactions/export', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'statement.csv';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      const csvContent = "data:text/csv;charset=utf-8," 
+        + "Date,Description,Amount,Type,Reference\n"
+        + transactions.map(tx => `${tx.created_at},${tx.description},${tx.amount},${tx.type},${tx.reference_id || ''}`).join("\n");
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "statement.csv");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     } catch (error) {
       toast.error('Failed to export statement');
     }

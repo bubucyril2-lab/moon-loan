@@ -2,36 +2,39 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, User, Send, MessageSquare, ShieldCheck, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../hooks/useChat';
+import { storageService } from '../../services/storage';
 import { format } from 'date-fns';
 import { safeFormat } from '../../utils/date';
 
 interface Customer {
-  id: number;
+  id: string;
   full_name: string;
   email: string;
   status: string;
 }
 
 const AdminChat = () => {
-  const { token, user } = useAuth();
+  const { user } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [search, setSearch] = useState('');
   const [input, setInput] = useState('');
   
-  const { messages, sendMessage, isOnline } = useChat(selectedCustomer?.id);
+  const { messages, sendMessage } = useChat(selectedCustomer?.id);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchCustomers = async () => {
-      const res = await fetch('/api/admin/customers', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setCustomers(data);
+      const users = (await storageService.getUsers()).filter(u => u.role === 'customer');
+      setCustomers(users.map(u => ({
+        id: u.id,
+        full_name: u.fullName || u.full_name || '',
+        email: u.email,
+        status: u.status || 'active'
+      })));
     };
     fetchCustomers();
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -114,16 +117,16 @@ const AdminChat = () => {
               {messages.map((msg, i) => (
                 <div 
                   key={i} 
-                  className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`max-w-[80%] rounded-2xl p-4 shadow-sm ${
-                    msg.sender_id === user?.id 
+                    msg.senderId === user?.id 
                       ? 'bg-slate-900 text-white rounded-tr-none' 
                       : 'bg-white text-slate-900 border border-slate-200 rounded-tl-none'
                   }`}>
-                    <p className="text-sm leading-relaxed">{msg.message}</p>
-                    <p className={`text-[10px] mt-2 opacity-60 ${msg.sender_id === user?.id ? 'text-right' : 'text-left'}`}>
-                      {safeFormat(msg.created_at, 'HH:mm')}
+                    <p className="text-sm leading-relaxed">{msg.text}</p>
+                    <p className={`text-[10px] mt-2 opacity-60 ${msg.senderId === user?.id ? 'text-right' : 'text-left'}`}>
+                      {safeFormat(msg.createdAt, 'HH:mm')}
                     </p>
                   </div>
                 </div>

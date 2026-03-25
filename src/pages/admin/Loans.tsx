@@ -16,9 +16,11 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { safeFormat } from '../../utils/date';
 
+import { storageService } from '../../services/storage';
+
 interface AdminLoan {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   full_name: string;
   email: string;
   amount: number;
@@ -30,7 +32,7 @@ interface AdminLoan {
 }
 
 const AdminLoans = () => {
-  const { token } = useAuth();
+  const { user: adminUser } = useAuth();
   const [loans, setLoans] = useState<AdminLoan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -40,11 +42,26 @@ const AdminLoans = () => {
 
   const fetchLoans = async () => {
     try {
-      const res = await fetch('/api/admin/loans', {
-        headers: { Authorization: `Bearer ${token}` }
+      const allLoans = await storageService.getLoans();
+      const users = await storageService.getUsers();
+
+      const enrichedLoans = allLoans.map(loan => {
+        const user = users.find(u => u.id === loan.userId);
+        return {
+          id: loan.id,
+          user_id: loan.userId,
+          full_name: user?.fullName || user?.full_name || 'Unknown',
+          email: user?.email || 'N/A',
+          amount: loan.amount,
+          interest_rate: loan.interestRate || loan.interest_rate || 0,
+          status: loan.status,
+          repayment_schedule: loan.repaymentSchedule || loan.repayment_schedule || '',
+          paid_amount: loan.paidAmount || loan.paid_amount || 0,
+          created_at: loan.createdAt || loan.created_at || ''
+        };
       });
-      const data = await res.json();
-      setLoans(data);
+
+      setLoans(enrichedLoans.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
     } catch (error) {
       toast.error('Failed to fetch loans');
     } finally {
@@ -54,23 +71,39 @@ const AdminLoans = () => {
 
   useEffect(() => {
     fetchLoans();
-  }, [token]);
+  }, []);
 
-  const handleStatusUpdate = async (id: number, status: string) => {
+  const handleStatusUpdate = async (id: string, status: 'pending' | 'approved' | 'rejected' | 'repaying' | 'completed') => {
+    if (!adminUser) return;
     try {
-      const res = await fetch(`/api/admin/loans/${id}/status`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ status })
+      const allLoans = await storageService.getLoans();
+      const loan = allLoans.find(l => l.id === id);
+      if (!loan) throw new Error('Loan not found');
+
+      const updatedLoan = { ...loan, status };
+      await storageService.saveLoan(updatedLoan);
+
+      await storageService.saveNotification({
+        id: Math.random().toString(36).substr(2, 9),
+        userId: loan.userId,
+        title: `Loan ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+        message: `Your loan application for $${loan.amount.toLocaleString()} has been ${status}.`,
+        type: status === 'approved' ? 'success' : 'alert',
+        isRead: false,
+        createdAt: new Date().toISOString()
       });
 
-      if (res.ok) {
-        toast.success(`Loan ${status}`);
-        fetchLoans();
-      }
+      await storageService.saveAuditLog({
+        id: Math.random().toString(36).substr(2, 9),
+        adminId: adminUser.id,
+        adminName: adminUser.fullName || adminUser.full_name || '',
+        action: 'loan_status_update',
+        details: `Set loan ${id} status to ${status}`,
+        createdAt: new Date().toISOString()
+      });
+
+      toast.success(`Loan ${status}`);
+      fetchLoans();
     } catch (error) {
       toast.error('Update failed');
     }
@@ -78,25 +111,49 @@ const AdminLoans = () => {
 
   const handleRepayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedLoan) return;
+    if (!selectedLoan || !adminUser) return;
     setIsSubmitting(true);
 
     try {
-      const res = await fetch(`/api/admin/loans/${selectedLoan.id}/repayment`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ amount: parseFloat(repaymentAmount) })
+      const allLoans = await storageService.getLoans();
+      const loan = allLoans.find(l => l.id === selectedLoan.id);
+      if (!loan) throw new Error('Loan not found');
+
+      const amount = parseFloat(repaymentAmount);
+      const currentPaidAmount = loan.paidAmount || loan.paid_amount || 0;
+      const newPaidAmount = currentPaidAmount + amount;
+      const newStatus = newPaidAmount >= loan.amount ? 'completed' : 'repaying';
+
+      await storageService.saveLoan({
+        ...loan,
+        paidAmount: newPaidAmount,
+        paid_amount: newPaidAmount,
+        status: newStatus
       });
 
-      if (res.ok) {
-        toast.success('Repayment recorded');
-        setSelectedLoan(null);
-        setRepaymentAmount('');
-        fetchLoans();
-      }
+      await storageService.saveNotification({
+        id: Math.random().toString(36).substr(2, 9),
+        userId: loan.userId,
+        title: 'Loan Repayment Recorded',
+        message: `A repayment of $${amount.toLocaleString()} has been recorded for your loan.`,
+        type: 'success',
+        isRead: false,
+        createdAt: new Date().toISOString()
+      });
+
+      await storageService.saveAuditLog({
+        id: Math.random().toString(36).substr(2, 9),
+        adminId: adminUser.id,
+        adminName: adminUser.fullName || adminUser.full_name || '',
+        action: 'loan_repayment',
+        details: `Recorded $${amount} repayment for loan ${loan.id}`,
+        createdAt: new Date().toISOString()
+      });
+
+      toast.success('Repayment recorded');
+      setSelectedLoan(null);
+      setRepaymentAmount('');
+      fetchLoans();
     } catch (error) {
       toast.error('Repayment failed');
     } finally {

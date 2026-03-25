@@ -13,8 +13,10 @@ import {
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 
+import { storageService } from '../../services/storage';
+
 const AdminSettings = () => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [settings, setSettings] = useState({
@@ -28,11 +30,8 @@ const AdminSettings = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch('/api/admin/settings', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const data = await res.json();
-        setSettings(data);
+        const data = await storageService.getSettings();
+        if (data) setSettings(data);
       } catch (error) {
         toast.error('Failed to load settings');
       } finally {
@@ -40,24 +39,13 @@ const AdminSettings = () => {
       }
     };
     fetchSettings();
-  }, [token]);
+  }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify(settings)
-      });
-      if (res.ok) {
-        toast.success('System settings updated successfully');
-      } else {
-        throw new Error('Failed to save settings');
-      }
+      await storageService.saveSettings(settings);
+      toast.success('System settings updated successfully');
     } catch (error) {
       toast.error('Failed to save settings');
     } finally {

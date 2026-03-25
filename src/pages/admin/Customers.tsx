@@ -20,8 +20,10 @@ import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { safeFormat, safeDate } from '../../utils/date';
 
+import { storageService } from '../../services/storage';
+
 interface Customer {
-  id: number;
+  id: string;
   email: string;
   full_name: string;
   status: string;
@@ -32,7 +34,7 @@ interface Customer {
 }
 
 const AdminCustomers = () => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -66,11 +68,23 @@ const AdminCustomers = () => {
 
   const fetchCustomers = async () => {
     try {
-      const res = await fetch('/api/admin/customers', {
-        headers: { Authorization: `Bearer ${token}` }
+      const users = (await storageService.getUsers()).filter(u => u.role === 'customer');
+      const accounts = await storageService.getAccounts();
+      
+      const customerData = users.map(u => {
+        const account = accounts.find(a => a.userId === u.id);
+        return {
+          id: u.id,
+          email: u.email,
+          full_name: u.full_name || u.fullName || '',
+          status: u.status,
+          account_number: account?.accountNumber || account?.account_number || '',
+          balance: account?.balance || 0,
+          created_at: u.created_at || u.createdAt || '',
+          pin: account?.pin
+        };
       });
-      const data = await res.json();
-      setCustomers(data);
+      setCustomers(customerData);
     } catch (error) {
       toast.error('Failed to fetch customers');
     } finally {
@@ -78,14 +92,26 @@ const AdminCustomers = () => {
     }
   };
 
-  const fetchCustomerDetails = async (id: number) => {
+  const fetchCustomerDetails = async (id: string) => {
     setIsLoadingDetails(true);
     try {
-      const res = await fetch(`/api/admin/customers/${id}/details`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const customer = await storageService.getUserById(id);
+      const account = await storageService.getAccountByUserId(id);
+      const transactions = account ? await storageService.getTransactionsByAccountId(account.id) : [];
+      const loans = (await storageService.getLoans()).filter(l => l.userId === id);
+
+      if (!customer || !account) throw new Error('Customer not found');
+
+      setShowDetailsModal({
+        customer: {
+          ...customer,
+          account_number: account.accountNumber || account.account_number,
+          balance: account.balance,
+          pin: account.pin
+        },
+        transactions: transactions.sort((a, b) => new Date(b.createdAt || b.created_at || '').getTime() - new Date(a.createdAt || a.created_at || '').getTime()),
+        loans
       });
-      const data = await res.json();
-      setShowDetailsModal(data);
     } catch (error) {
       toast.error('Failed to fetch customer details');
     } finally {
@@ -95,36 +121,60 @@ const AdminCustomers = () => {
 
   useEffect(() => {
     fetchCustomers();
-  }, [token]);
+  }, []);
 
   const handleAdjustBalance = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!showAdjustModal) return;
+    if (!showAdjustModal || !user) return;
     setIsAdjusting(true);
 
     try {
-      const res = await fetch(`/api/admin/customers/${showAdjustModal.id}/adjust-balance`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({
-          amount: parseFloat(adjustAmount),
-          type: adjustType,
-          description: adjustDescription
-        })
+      const account = await storageService.getAccountByUserId(showAdjustModal.id);
+      if (!account) throw new Error('Account not found');
+
+      const amount = parseFloat(adjustAmount);
+      const newBalance = adjustType === 'credit' ? account.balance + amount : account.balance - amount;
+
+      if (newBalance < 0) throw new Error('Insufficient balance');
+
+      await storageService.saveAccount({ ...account, balance: newBalance });
+      
+      await storageService.saveTransaction({
+        id: Math.random().toString(36).substr(2, 9),
+        accountId: account.id,
+        userId: showAdjustModal.id,
+        type: adjustType,
+        amount,
+        description: adjustDescription || `Balance adjustment by admin`,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString()
       });
 
-      if (res.ok) {
-        toast.success('Balance adjusted successfully');
-        setShowAdjustModal(null);
-        setAdjustAmount('');
-        setAdjustDescription('');
-        fetchCustomers();
-      } else {
-        throw new Error('Adjustment failed');
-      }
+      await storageService.saveNotification({
+        id: Math.random().toString(36).substr(2, 9),
+        userId: showAdjustModal.id,
+        title: 'Account Balance Adjusted',
+        message: `Your account balance has been ${adjustType === 'credit' ? 'credited' : 'debited'} with $${amount.toLocaleString()}.`,
+        type: adjustType === 'credit' ? 'success' : 'alert',
+        isRead: false,
+        createdAt: new Date().toISOString()
+      });
+
+      await storageService.saveAuditLog({
+        id: Math.random().toString(36).substr(2, 9),
+        adminId: user.id,
+        adminName: user.fullName || user.full_name || '',
+        action: 'adjust_balance',
+        details: `${adjustType} $${amount} for ${showAdjustModal.full_name}`,
+        createdAt: new Date().toISOString()
+      });
+
+      toast.success('Balance adjusted successfully');
+      setShowAdjustModal(null);
+      setAdjustAmount('');
+      setAdjustDescription('');
+      fetchCustomers();
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -132,21 +182,35 @@ const AdminCustomers = () => {
     }
   };
 
-  const handleStatusUpdate = async (id: number, status: string) => {
+  const handleStatusUpdate = async (id: string, status: 'pending' | 'active' | 'disabled') => {
+    if (!user) return;
     try {
-      const res = await fetch(`/api/admin/customers/${id}/status`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ status })
+      const customer = await storageService.getUserById(id);
+      if (!customer) throw new Error('Customer not found');
+
+      await storageService.saveUser({ ...customer, status });
+
+      await storageService.saveNotification({
+        id: Math.random().toString(36).substr(2, 9),
+        userId: id,
+        title: 'Account Status Updated',
+        message: `Your account status has been updated to ${status}.`,
+        type: status === 'active' ? 'success' : 'alert',
+        isRead: false,
+        createdAt: new Date().toISOString()
       });
 
-      if (res.ok) {
-        toast.success(`Customer ${status}`);
-        fetchCustomers();
-      }
+      await storageService.saveAuditLog({
+        id: Math.random().toString(36).substr(2, 9),
+        adminId: user.id,
+        adminName: user.fullName || user.full_name || '',
+        action: 'update_status',
+        details: `Set status to ${status} for ${customer.full_name || customer.fullName}`,
+        createdAt: new Date().toISOString()
+      });
+
+      toast.success(`Customer ${status}`);
+      fetchCustomers();
     } catch (error) {
       toast.error('Update failed');
     }
@@ -154,22 +218,34 @@ const AdminCustomers = () => {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!showEditModal) return;
+    if (!showEditModal || !user) return;
     setIsUpdating(true);
     try {
-      const res = await fetch(`/api/admin/customers/${showEditModal.id}/update`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify(editForm)
+      const customer = await storageService.getUserById(showEditModal.id);
+      if (!customer) throw new Error('Customer not found');
+
+      await storageService.saveUser({
+        ...customer,
+        full_name: editForm.full_name,
+        fullName: editForm.full_name,
+        email: editForm.email,
+        country: editForm.country,
+        city: editForm.city,
+        age: parseInt(editForm.age) || 0
       });
-      if (res.ok) {
-        toast.success('Customer profile updated');
-        setShowEditModal(null);
-        fetchCustomers();
-      }
+
+      await storageService.saveAuditLog({
+        id: Math.random().toString(36).substr(2, 9),
+        adminId: user.id,
+        adminName: user.fullName || user.full_name || '',
+        action: 'edit_profile',
+        details: `Updated profile for ${customer.full_name || customer.fullName}`,
+        createdAt: new Date().toISOString()
+      });
+
+      toast.success('Customer profile updated');
+      setShowEditModal(null);
+      fetchCustomers();
     } catch (error) {
       toast.error('Update failed');
     } finally {
@@ -179,25 +255,31 @@ const AdminCustomers = () => {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!showMessageModal) return;
+    if (!showMessageModal || !user) return;
     setIsSending(true);
     try {
-      const res = await fetch('/api/admin/notifications/send', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({
-          userId: showMessageModal.id,
-          ...messageForm
-        })
+      await storageService.saveNotification({
+        id: Math.random().toString(36).substr(2, 9),
+        userId: showMessageModal.id,
+        title: messageForm.title,
+        message: messageForm.message,
+        type: messageForm.type as any,
+        isRead: false,
+        createdAt: new Date().toISOString()
       });
-      if (res.ok) {
-        toast.success('Message sent successfully');
-        setShowMessageModal(null);
-        setMessageForm({ title: '', message: '', type: 'info' });
-      }
+
+      await storageService.saveAuditLog({
+        id: Math.random().toString(36).substr(2, 9),
+        adminId: user.id,
+        adminName: user.fullName || user.full_name || '',
+        action: 'send_notification',
+        details: `Sent notification to ${showMessageModal.full_name}: ${messageForm.title}`,
+        createdAt: new Date().toISOString()
+      });
+
+      toast.success('Message sent successfully');
+      setShowMessageModal(null);
+      setMessageForm({ title: '', message: '', type: 'info' });
     } catch (error) {
       toast.error('Failed to send message');
     } finally {
@@ -207,22 +289,36 @@ const AdminCustomers = () => {
 
   const handleResetPin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!showResetPinModal) return;
+    if (!showResetPinModal || !user) return;
     setIsResetting(true);
     try {
-      const res = await fetch(`/api/admin/customers/${showResetPinModal.id}/reset-pin`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ newPin })
+      const account = await storageService.getAccountByUserId(showResetPinModal.id);
+      if (!account) throw new Error('Account not found');
+
+      await storageService.saveAccount({ ...account, pin: newPin });
+
+      await storageService.saveNotification({
+        id: Math.random().toString(36).substr(2, 9),
+        userId: showResetPinModal.id,
+        title: 'Transfer PIN Reset',
+        message: `Your transfer PIN has been reset by an administrator.`,
+        type: 'info',
+        isRead: false,
+        createdAt: new Date().toISOString()
       });
-      if (res.ok) {
-        toast.success('Transfer PIN reset successfully');
-        setShowResetPinModal(null);
-        setNewPin('');
-      }
+
+      await storageService.saveAuditLog({
+        id: Math.random().toString(36).substr(2, 9),
+        adminId: user.id,
+        adminName: user.fullName || user.full_name || '',
+        action: 'reset_pin',
+        details: `Reset PIN for ${showResetPinModal.full_name}`,
+        createdAt: new Date().toISOString()
+      });
+
+      toast.success('Transfer PIN reset successfully');
+      setShowResetPinModal(null);
+      setNewPin('');
     } catch (error) {
       toast.error('Failed to reset PIN');
     } finally {
@@ -230,28 +326,15 @@ const AdminCustomers = () => {
     }
   };
 
-  const handleToggleStatus = async (userId: number, currentStatus: string) => {
+  const handleToggleStatus = (userId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'disabled' : 'active';
     if (!window.confirm(`Are you sure you want to ${newStatus === 'active' ? 'enable' : 'disable'} this account?`)) return;
 
     setIsUpdatingStatus(true);
     try {
-      const res = await fetch(`/api/admin/customers/${userId}/status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-
-      if (res.ok) {
-        toast.success(`Account ${newStatus === 'active' ? 'enabled' : 'disabled'} successfully`);
-        fetchCustomerDetails(userId);
-        fetchCustomers();
-      } else {
-        throw new Error('Failed to update status');
-      }
+      handleStatusUpdate(userId, newStatus);
+      fetchCustomerDetails(userId);
+      fetchCustomers();
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -260,18 +343,31 @@ const AdminCustomers = () => {
   };
 
   const handleDeleteAccount = async () => {
-    if (!showDeleteConfirm) return;
+    if (!showDeleteConfirm || !user) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/admin/customers/${showDeleteConfirm.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        toast.success('Account deleted successfully');
-        setShowDeleteConfirm(null);
-        fetchCustomers();
+      const account = await storageService.getAccountByUserId(showDeleteConfirm.id);
+      
+      await storageService.deleteUser(showDeleteConfirm.id);
+      if (account) {
+        await storageService.deleteAccount(account.id);
+        await storageService.deleteTransactionsByAccountId(account.id);
       }
+      await storageService.deleteLoansByUserId(showDeleteConfirm.id);
+      await storageService.deleteNotificationsByUserId(showDeleteConfirm.id);
+
+      await storageService.saveAuditLog({
+        id: Math.random().toString(36).substr(2, 9),
+        adminId: user.id,
+        adminName: user.fullName || user.full_name || '',
+        action: 'delete_account',
+        details: `Deleted account for ${showDeleteConfirm.full_name}`,
+        createdAt: new Date().toISOString()
+      });
+
+      toast.success('Account deleted successfully');
+      setShowDeleteConfirm(null);
+      fetchCustomers();
     } catch (error) {
       toast.error('Failed to delete account');
     } finally {

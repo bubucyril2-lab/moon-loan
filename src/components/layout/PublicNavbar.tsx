@@ -16,10 +16,6 @@ const PublicNavbar = () => {
             </Link>
           </div>
           
-          <div className="flex-1 flex items-center justify-center">
-            <div id="google_translate_element" className="scale-75 sm:scale-100"></div>
-          </div>
-          
           <div className="hidden md:flex items-center space-x-8">
             <Link to="/" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">Home</Link>
             <Link to="/about" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">About</Link>

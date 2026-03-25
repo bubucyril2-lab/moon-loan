@@ -15,8 +15,10 @@ import { Account } from '../../types';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
+import { storageService } from '../../services/storage';
+
 const CustomerTransfers = () => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [account, setAccount] = useState<Account | null>(null);
   const [recipientAccount, setRecipientAccount] = useState('');
@@ -43,42 +45,37 @@ const CustomerTransfers = () => {
   const [newBeneficiary, setNewBeneficiary] = useState({ name: '', accountNumber: '', bankName: 'Moonstone Bank' });
 
   const fetchBeneficiaries = async () => {
-    const res = await fetch('/api/customer/beneficiaries', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const data = await res.json();
+    if (!user) return;
+    const data = await storageService.getBeneficiariesByUserId(user.id);
     setBeneficiaries(data);
   };
 
   useEffect(() => {
     const fetchAccount = async () => {
-      const res = await fetch('/api/customer/account', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setAccount(data);
+      if (!user) return;
+      const data = await storageService.getAccountByUserId(user.id);
+      if (data) setAccount(data);
     };
     fetchAccount();
     fetchBeneficiaries();
-  }, [token]);
+  }, [user]);
 
   const handleAddBeneficiary = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     try {
-      const res = await fetch('/api/customer/beneficiaries', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify(newBeneficiary)
+      await storageService.saveBeneficiary({
+        id: Math.random().toString(36).substr(2, 9),
+        userId: user.id,
+        name: newBeneficiary.name,
+        accountNumber: newBeneficiary.accountNumber,
+        bankName: newBeneficiary.bankName,
+        createdAt: new Date().toISOString()
       });
-      if (res.ok) {
-        toast.success('Beneficiary added');
-        setIsAddingBeneficiary(false);
-        setNewBeneficiary({ name: '', accountNumber: '', bankName: 'Moonstone Bank' });
-        fetchBeneficiaries();
-      }
+      toast.success('Beneficiary added');
+      setIsAddingBeneficiary(false);
+      setNewBeneficiary({ name: '', accountNumber: '', bankName: 'Moonstone Bank' });
+      await fetchBeneficiaries();
     } catch (error) {
       toast.error('Failed to add beneficiary');
     }
@@ -86,34 +83,79 @@ const CustomerTransfers = () => {
 
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user || !account) return;
     setIsLoading(true);
 
     try {
-      const res = await fetch('/api/customer/transfer', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({
-          toAccountNumber: recipientAccount,
-          amount: parseFloat(amount),
-          description,
-          pin,
-          bankName: transferType === 'internal' ? 'Moonstone Bank' : bankName,
-          recipientName,
-          type: transferType,
-          currency: transferType === 'international' ? currency : 'USD',
-          swiftCode: transferType === 'international' ? swiftCode : undefined
-        })
+      const transferAmount = parseFloat(amount);
+      const fee = transferType === 'internal' ? 0 : transferType === 'local' ? 5 : 25;
+      const totalDebit = transferAmount + fee;
+
+      if (account.balance < totalDebit) {
+        throw new Error('Insufficient balance');
+      }
+
+      if (user.pin !== pin) {
+        throw new Error('Invalid transaction PIN');
+      }
+
+      // Update sender account
+      await storageService.saveAccount({
+        ...account,
+        balance: account.balance - totalDebit
       });
 
-      const data = await res.json();
+      // Create sender transaction
+      await storageService.saveTransaction({
+        id: Math.random().toString(36).substr(2, 9),
+        accountId: account.id,
+        userId: user.id,
+        amount: transferAmount,
+        type: 'debit',
+        description: `Transfer to ${recipientName} (${recipientAccount})`,
+        status: 'completed',
+        reference_id: `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+        created_at: new Date().toISOString()
+      });
 
-      if (!res.ok) throw new Error(data.error || 'Transfer failed');
+      // If internal, update recipient account
+      if (transferType === 'internal') {
+        const allAccounts = await storageService.getAccounts();
+        const recipientAcc = allAccounts.find(a => a.account_number === recipientAccount);
+        if (recipientAcc) {
+          await storageService.saveAccount({
+            ...recipientAcc,
+            balance: recipientAcc.balance + transferAmount
+          });
+
+          await storageService.saveTransaction({
+            id: Math.random().toString(36).substr(2, 9),
+            accountId: recipientAcc.id,
+            userId: recipientAcc.userId,
+            amount: transferAmount,
+            type: 'credit',
+            description: `Transfer from ${user.fullName || user.full_name}`,
+            status: 'completed',
+            reference_id: `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+            created_at: new Date().toISOString()
+          });
+
+          await storageService.saveNotification({
+            id: Math.random().toString(36).substr(2, 9),
+            userId: recipientAcc.userId,
+            title: 'Funds Received',
+            message: `You have received $${transferAmount.toLocaleString()} from ${user.fullName || user.full_name}.`,
+            type: 'success',
+            isRead: false,
+            read: false,
+            createdAt: new Date().toISOString(),
+            created_at: new Date().toISOString()
+          });
+        }
+      }
 
       setStep(3);
-      toast.success('Transfer successful!');
+      toast.success('TRANSFER SUCCESSFUL');
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -131,12 +173,12 @@ const CustomerTransfers = () => {
 
   if (step === 3) {
     return (
-      <div className="max-w-2xl mx-auto py-12 px-4">
-        <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-xl shadow-slate-200/50">
+      <div className="max-w-2xl mx-auto py-12 px-4 min-h-[70vh] flex items-center justify-center">
+        <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-xl shadow-slate-200/50 w-full">
           <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-8">
             <CheckCircle2 className="h-12 w-12 text-emerald-600" />
           </div>
-          <h2 className="text-3xl font-bold text-slate-900 mb-4">Transfer Successful!</h2>
+          <h2 className="text-4xl font-black text-emerald-600 mb-4 tracking-tighter uppercase">TRANSFER SUCCESSFUL</h2>
           <p className="text-slate-600 mb-8">
             Your transfer of <span className="font-bold text-slate-900">${parseFloat(amount).toLocaleString()}</span> to account <span className="font-mono font-bold text-slate-900">{recipientAccount}</span> has been processed successfully.
           </p>

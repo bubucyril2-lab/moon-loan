@@ -1,7 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Landmark, Mail, Lock, User, Loader2, AlertCircle, CheckCircle2, Globe, MapPin, Calendar, Camera } from 'lucide-react';
+import { Landmark, Mail, Lock, User, Loader2, AlertCircle, Globe, MapPin, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../firebase';
+import { firebaseService } from '../../services/firebaseService';
+import { User as UserType, Account } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -13,25 +18,10 @@ const Register = () => {
     city: '',
     age: ''
   });
-  const [profilePicture, setProfilePicture] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isSuccess, setIsSuccess] = useState(false);
   const navigate = useNavigate();
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setProfilePicture(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,30 +34,62 @@ const Register = () => {
     setError('');
 
     try {
-      const data = new FormData();
-      data.append('email', formData.email);
-      data.append('password', formData.password);
-      data.append('fullName', formData.fullName);
-      data.append('country', formData.country);
-      data.append('city', formData.city);
-      data.append('age', formData.age);
-      if (profilePicture) {
-        data.append('profilePicture', profilePicture);
+      // Create user in Firebase Auth
+      let userId: string;
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+        userId = userCredential.user.uid;
+      } catch (authErr: any) {
+        if (authErr.code === 'auth/email-already-in-use') {
+          // If user exists in Auth, try to sign in to verify ownership
+          const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+          userId = userCredential.user.uid;
+          
+          // Check if Firestore document already exists
+          const existingUser = await firebaseService.getUserById(userId);
+          if (existingUser) {
+            throw new Error('An account with this email already exists and is fully registered. Please log in.');
+          }
+          // If document is missing, we proceed to create it (Repair mode)
+        } else {
+          throw authErr;
+        }
       }
+      
+      const newUser: any = {
+        id: userId,
+        email: formData.email,
+        fullName: formData.fullName,
+        role: (formData.email === 'admin@gmail.com' || formData.email === 'bubucyril2@gmail.com') ? 'admin' : 'customer',
+        status: 'active' as const,
+        country: formData.country,
+        city: formData.city,
+        age: parseInt(formData.age),
+        createdAt: new Date().toISOString()
+      };
 
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        body: data,
-      });
+      // Create initial bank account
+      const accountNumber = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+      const newAccount: Account = {
+        id: Math.random().toString(36).substring(2, 15),
+        userId: userId,
+        accountNumber: accountNumber,
+        balance: 0,
+        status: 'active',
+        createdAt: new Date().toISOString()
+      };
 
-      const result = await response.json();
+      await firebaseService.saveUser(newUser);
+      await firebaseService.saveAccount(newAccount);
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Registration failed');
+      login(newUser);
+      toast.success('Welcome to Moonstone Saving Bank!');
+      
+      if (newUser.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
       }
-
-      setIsSuccess(true);
-      toast.success('Application submitted successfully!');
     } catch (err: any) {
       setError(err.message);
       toast.error(err.message);
@@ -75,28 +97,6 @@ const Register = () => {
       setIsLoading(false);
     }
   };
-
-  if (isSuccess) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-          <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center">
-              <CheckCircle2 className="h-12 w-12 text-emerald-600" />
-            </div>
-          </div>
-          <h2 className="text-3xl font-extrabold text-slate-900 mb-4">Application Submitted!</h2>
-          <p className="text-slate-600 mb-8">
-            Thank you for choosing Moonstone Saving Bank. Your application is currently being reviewed by our team. 
-            You will receive an email once your account is activated.
-          </p>
-          <Link to="/login" className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 transition-all">
-            Return to Login
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -123,45 +123,6 @@ const Register = () => {
                 {error}
               </div>
             )}
-            
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Profile Picture</label>
-              <div className="flex items-center gap-4">
-                <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-20 h-20 bg-slate-100 rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-all overflow-hidden relative group"
-                >
-                  {previewUrl ? (
-                    <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                  ) : (
-                    <>
-                      <Camera className="h-6 w-6 text-slate-400" />
-                      <span className="text-[10px] font-bold text-slate-400 uppercase mt-1">Upload</span>
-                    </>
-                  )}
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Camera className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500">Upload a clear profile picture. Max size 5MB.</p>
-                  <button 
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="mt-2 text-xs font-bold text-emerald-600 hover:text-emerald-700"
-                  >
-                    Select Image
-                  </button>
-                </div>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  accept="image/*"
-                  className="hidden"
-                />
-              </div>
-            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -176,7 +137,7 @@ const Register = () => {
                     value={formData.country}
                     onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                     className="appearance-none block w-full pl-10 px-3 py-3 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                    placeholder="USA"
+                    placeholder="Your country"
                   />
                 </div>
               </div>
@@ -193,7 +154,7 @@ const Register = () => {
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                     className="appearance-none block w-full pl-10 px-3 py-3 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                    placeholder="New York"
+                    placeholder="Your city"
                   />
                 </div>
               </div>
@@ -212,7 +173,7 @@ const Register = () => {
                   value={formData.age}
                   onChange={(e) => setFormData({ ...formData, age: e.target.value })}
                   className="appearance-none block w-full pl-10 px-3 py-3 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                  placeholder="25"
+                  placeholder="Your age"
                 />
               </div>
             </div>
@@ -229,7 +190,7 @@ const Register = () => {
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                   className="appearance-none block w-full pl-10 px-3 py-3 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                  placeholder="John Doe"
+                  placeholder="Your full name"
                 />
               </div>
             </div>
@@ -246,7 +207,7 @@ const Register = () => {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="appearance-none block w-full pl-10 px-3 py-3 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                  placeholder="you@example.com"
+                  placeholder="Your email address"
                 />
               </div>
             </div>

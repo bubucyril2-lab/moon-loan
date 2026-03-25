@@ -1,4 +1,4 @@
-import { app } from '../server.js';
+import { app } from '../server';
 
 // Health check for Vercel
 app.get('/api/health', (req, res) => {

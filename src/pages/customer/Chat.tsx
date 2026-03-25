@@ -17,8 +17,8 @@ const CustomerChat = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [input, setInput] = useState('');
-  // Assuming admin ID is 1 for now. In a real app, you might fetch available support agents.
-  const { messages, sendMessage, isOnline } = useChat(1);
+  // Assuming admin ID is 'admin' for now. In a real app, you might fetch available support agents.
+  const { messages, sendMessage, isOnline } = useChat('admin');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -78,16 +78,16 @@ const CustomerChat = () => {
           messages.map((msg, i) => (
             <div 
               key={i} 
-              className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
+              className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
             >
               <div className={`max-w-[80%] rounded-2xl p-4 shadow-sm ${
-                msg.sender_id === user?.id 
+                msg.senderId === user?.id 
                   ? 'bg-emerald-600 text-white rounded-tr-none' 
                   : 'bg-white text-slate-900 border border-slate-200 rounded-tl-none'
               }`}>
-                <p className="text-sm leading-relaxed">{msg.message}</p>
-                <p className={`text-[10px] mt-2 opacity-60 ${msg.sender_id === user?.id ? 'text-right' : 'text-left'}`}>
-                  {safeFormat(msg.created_at, 'HH:mm')}
+                <p className="text-sm leading-relaxed">{msg.text}</p>
+                <p className={`text-[10px] mt-2 opacity-60 ${msg.senderId === user?.id ? 'text-right' : 'text-left'}`}>
+                  {safeFormat(msg.createdAt, 'HH:mm')}
                 </p>
               </div>
             </div>

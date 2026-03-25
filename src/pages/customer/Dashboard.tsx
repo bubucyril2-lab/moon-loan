@@ -12,19 +12,21 @@ import {
   ArrowRight,
   Send,
   Banknote,
-  History
+  User as UserIcon 
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Account, Transaction } from '../../types';
-import { format } from 'date-fns';
 import { safeFormat } from '../../utils/date';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { storageService } from '../../services/storage';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
-import { Globe, MapPin, Calendar, User as UserIcon } from 'lucide-react';
+import { Globe, MapPin, Calendar } from 'lucide-react';
+
+import TradingChart from '../../components/TradingChart';
 
 const CustomerDashboard = () => {
-  const { token, user } = useAuth();
+  const { user } = useAuth();
   const [account, setAccount] = useState<Account | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,53 +34,70 @@ const CustomerDashboard = () => {
   const [amount, setAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchData = async () => {
-    try {
-      const [accRes, transRes] = await Promise.all([
-        fetch('/api/customer/account', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('/api/customer/transactions', { headers: { Authorization: `Bearer ${token}` } })
-      ]);
-
-      const accData = await accRes.json();
-      const transData = await transRes.json();
-
-      setAccount(accData);
-      setTransactions(transData);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchData();
-  }, [token]);
+    if (!user) return;
+
+    const loadData = async () => {
+      const acc = await storageService.getAccountByUserId(user.id);
+      if (acc) {
+        setAccount(acc);
+        const txs = await storageService.getTransactionsByAccountId(acc.id);
+        setTransactions(txs.sort((a, b) => new Date(b.createdAt || b.created_at || '').getTime() - new Date(a.createdAt || a.created_at || '').getTime()));
+      }
+      setIsLoading(false);
+    };
+
+    loadData();
+    
+    // In a real app with local storage, we might want to listen for storage events
+    // but for this demo, simple load is enough.
+  }, [user]);
 
   const handleAction = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!account || !user) return;
+    
+    const val = parseFloat(amount);
+    if (isNaN(val) || val <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+
+    if (showModal === 'withdraw' && val > account.balance) {
+      toast.error('Insufficient balance');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/customer/${showModal}`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ amount: parseFloat(amount) })
-      });
+      const newBalance = showModal === 'deposit' 
+        ? account.balance + val 
+        : account.balance - val;
 
-      if (res.ok) {
-        toast.success(`${showModal === 'deposit' ? 'Deposit' : 'Withdrawal'} successful!`);
-        setShowModal(null);
-        setAmount('');
-        fetchData();
-      } else {
-        const data = await res.json();
-        throw new Error(data.error || 'Action failed');
-      }
+      const updatedAccount = { ...account, balance: newBalance };
+      await storageService.saveAccount(updatedAccount);
+      setAccount(updatedAccount);
+
+      const newTransaction: Transaction = {
+        id: Math.random().toString(36).substring(2, 15),
+        accountId: account.id,
+        userId: user.id,
+        type: showModal === 'deposit' ? 'credit' : 'debit',
+        amount: val,
+        description: `${showModal === 'deposit' ? 'Deposit' : 'Withdrawal'} to account`,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      };
+
+      await storageService.saveTransaction(newTransaction);
+      setTransactions([newTransaction, ...transactions]);
+
+      toast.success(`${showModal === 'deposit' ? 'DEPOSIT' : 'WITHDRAWAL'} SUCCESSFUL`);
+      setShowModal(null);
+      setAmount('');
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || 'An error occurred');
     } finally {
       setIsSubmitting(false);
     }
@@ -139,7 +158,7 @@ const CustomerDashboard = () => {
             <div className="flex items-center gap-6">
               <div>
                 <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Account Number</p>
-                <p className="font-mono text-lg tracking-widest">{account?.account_number.replace(/(\d{4})/g, '$1 ')}</p>
+                <p className="font-mono text-lg tracking-widest">{account?.accountNumber.replace(/(\d{4})/g, '$1 ')}</p>
               </div>
               <div className="h-10 w-px bg-slate-700"></div>
               <div>
@@ -258,29 +277,11 @@ const CustomerDashboard = () => {
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-emerald-600" />
-              Spending Analysis
+              Live Market Trading
             </h3>
-            <select className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 text-xs font-bold text-slate-600">
-              <option>Last 7 Days</option>
-              <option>Last 30 Days</option>
-            </select>
           </div>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={transactions.slice(0, 7).reverse()}>
-                <defs>
-                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="created_at" hide />
-                <YAxis hide />
-                <Tooltip />
-                <Area type="monotone" dataKey="amount" stroke="#10b981" fillOpacity={1} fill="url(#colorValue)" strokeWidth={3} />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="h-[400px] w-full overflow-hidden rounded-2xl">
+            <TradingChart />
           </div>
         </div>
 

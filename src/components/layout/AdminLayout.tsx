@@ -114,10 +114,6 @@ const AdminLayout = () => {
             <span className="text-xs font-bold uppercase tracking-wider">Menu</span>
           </button>
           
-          <div className="flex-1 lg:flex-none flex items-center justify-center gap-4">
-            <div id="google_translate_element" className="scale-75 sm:scale-100"></div>
-          </div>
-          
           <div className="flex items-center gap-4">
             <NotificationCenter />
             <button

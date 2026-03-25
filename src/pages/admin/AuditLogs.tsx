@@ -16,28 +16,27 @@ import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
 interface AuditLog {
-  id: number;
-  admin_name: string;
+  id: string;
+  adminId: string;
+  adminName: string;
   action: string;
   details: string;
-  ip_address: string;
-  created_at: string;
+  createdAt: string;
 }
 
+import { storageService } from '../../services/storage';
+
 const AuditLogs = () => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     const fetchLogs = async () => {
       try {
-        const res = await fetch('/api/admin/audit-logs', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const data = await res.json();
+        const data = await storageService.getAuditLogs();
         setLogs(data);
       } catch (error) {
         toast.error('Failed to fetch audit logs');
@@ -46,7 +45,7 @@ const AuditLogs = () => {
       }
     };
     fetchLogs();
-  }, [token]);
+  }, []);
 
   const filteredLogs = logs.filter(log => 
     log.admin_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -97,7 +96,6 @@ const AuditLogs = () => {
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Administrator</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Details</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">IP Address</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -112,7 +110,7 @@ const AuditLogs = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2 text-slate-600">
                       <Clock className="h-4 w-4 text-slate-400" />
-                      <span className="text-sm font-medium">{safeFormat(log.created_at, 'MMM d, yyyy HH:mm:ss')}</span>
+                      <span className="text-sm font-medium">{safeFormat(log.createdAt, 'MMM d, yyyy HH:mm:ss')}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -120,7 +118,7 @@ const AuditLogs = () => {
                       <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
                         <User className="h-4 w-4 text-slate-600" />
                       </div>
-                      <span className="text-sm font-bold text-slate-900">{log.admin_name}</span>
+                      <span className="text-sm font-bold text-slate-900">{log.adminName}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -132,11 +130,6 @@ const AuditLogs = () => {
                     <p className="text-sm text-slate-600 max-w-md truncate" title={log.details}>
                       {log.details}
                     </p>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <code className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">
-                      {log.ip_address}
-                    </code>
                   </td>
                 </tr>
               ))}

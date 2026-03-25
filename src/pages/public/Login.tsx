@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Landmark, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../firebase';
+import { firebaseService } from '../../services/firebaseService';
+import { useAuth } from '../../context/AuthContext';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { login } = useAuth();
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,22 +21,38 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
+      // Firebase login
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userId = userCredential.user.uid;
+      
+      let user = await firebaseService.getUserById(userId);
+      
+      // Auto-create admin profile if it exists in Auth but missing in Firestore
+      if (!user && (email === 'admin@gmail.com' || email === 'bubucyril2@gmail.com')) {
+        const adminUser = {
+          id: userId,
+          email: email,
+          fullName: email === 'bubucyril2@gmail.com' ? 'Cyril Bubu' : 'System Administrator',
+          role: 'admin' as const,
+          status: 'active' as const,
+          createdAt: new Date().toISOString()
+        };
+        await firebaseService.saveUser(adminUser);
+        user = adminUser;
       }
 
-      login(data.token, data.user);
+      if (!user) {
+        throw new Error('User data not found. If you have already registered, please try registering again with the same credentials to complete your profile.');
+      }
+
+      if (user.status === 'disabled') {
+        throw new Error('Your account has been disabled. Please contact support.');
+      }
+
+      login(user);
       toast.success('Welcome back!');
       
-      if (data.user.role === 'admin') {
+      if (user.role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
@@ -89,7 +108,7 @@ const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="appearance-none block w-full pl-10 px-3 py-3 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                  placeholder="you@example.com or admin12345"
+                  placeholder="Enter your email"
                 />
               </div>
             </div>
@@ -111,7 +130,7 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="appearance-none block w-full pl-10 px-3 py-3 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                 />
               </div>
             </div>
@@ -130,9 +149,9 @@ const Login = () => {
               </div>
 
               <div className="text-sm">
-                <a href="#" className="font-medium text-emerald-600 hover:text-emerald-500">
+                <Link to="/forgot-password" title="Reset your password" id="forgot-password-link" className="font-medium text-emerald-600 hover:text-emerald-500">
                   Forgot your password?
-                </a>
+                </Link>
               </div>
             </div>
 

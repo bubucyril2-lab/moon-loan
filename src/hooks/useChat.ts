@@ -1,62 +1,44 @@
 import { useEffect, useState, useCallback } from 'react';
-import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
-import { Message } from '../types';
+import { ChatMessage } from '../types';
+import { storageService } from '../services/storage';
 
-export const useChat = (otherUserId?: number) => {
-  const { user, token } = useAuth();
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isOnline, setIsOnline] = useState(false);
+export const useChat = (otherUserId?: string) => {
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !otherUserId) return;
 
-    const newSocket = io({
-      auth: { token }
-    });
-
-    newSocket.on('connect', () => {
-      setIsOnline(true);
-      newSocket.emit('join', user.id);
-    });
-
-    newSocket.on('receive_message', (message: Message) => {
-      if (otherUserId && (message.sender_id === otherUserId || message.receiver_id === otherUserId)) {
-        setMessages((prev) => [...prev, message]);
-      }
-    });
-
-    newSocket.on('message_sent', (message: Message) => {
-      setMessages((prev) => [...prev, message]);
-    });
-
-    setSocket(newSocket);
-
-    return () => {
-      newSocket.close();
+    const fetchHistory = async () => {
+      const targetUserId = user.role === 'admin' ? otherUserId : user.id;
+      const history = await storageService.getChatMessages(targetUserId);
+      setMessages(history);
     };
-  }, [user, token, otherUserId]);
 
-  useEffect(() => {
-    if (otherUserId && token) {
-      fetch(`/api/chat/history/${otherUserId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-        .then(res => res.json())
-        .then(data => setMessages(data));
-    }
-  }, [otherUserId, token]);
+    fetchHistory();
 
-  const sendMessage = useCallback((message: string) => {
-    if (socket && otherUserId && user) {
-      socket.emit('send_message', {
+    // Poll for new messages (mock real-time)
+    const interval = setInterval(fetchHistory, 2000);
+    return () => clearInterval(interval);
+  }, [user, otherUserId]);
+
+  const sendMessage = useCallback(async (text: string) => {
+    if (otherUserId && user) {
+      const targetUserId = user.role === 'admin' ? otherUserId : user.id;
+      const newMessage: ChatMessage = {
+        id: Math.random().toString(36).substr(2, 9),
+        userId: targetUserId,
         senderId: user.id,
-        receiverId: otherUserId,
-        message
-      });
+        text,
+        isAdmin: user.role === 'admin',
+        createdAt: new Date().toISOString()
+      };
+      await storageService.saveChatMessage(newMessage);
+      setMessages(prev => [...prev, newMessage]);
     }
-  }, [socket, otherUserId, user]);
+  }, [otherUserId, user]);
 
   return { messages, sendMessage, isOnline };
 };

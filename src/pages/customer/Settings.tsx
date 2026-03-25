@@ -11,36 +11,28 @@ import {
   ArrowLeft,
   Camera
 } from 'lucide-react';
+import { storageService } from '../../services/storage';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
 const CustomerSettings = () => {
-  const { user, token, updateUser } = useAuth();
+  const { user, updateUser } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [pin, setPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
-  const [isUpdatingPin, setIsUpdatingPin] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [is2FAEnabled, setIs2FAEnabled] = useState(user?.twoFactorEnabled || false);
   const [isUpdating2FA, setIsUpdating2FA] = useState(false);
 
   const handleToggle2FA = async () => {
+    if (!user) return;
     setIsUpdating2FA(true);
     try {
-      const res = await fetch('/api/customer/settings/2fa', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ enabled: !is2FAEnabled })
-      });
-      if (res.ok) {
-        setIs2FAEnabled(!is2FAEnabled);
-        toast.success(`2FA ${!is2FAEnabled ? 'enabled' : 'disabled'} successfully`);
-      }
+      const updatedUser = { ...user, twoFactorEnabled: !is2FAEnabled };
+      await storageService.saveUser(updatedUser);
+      updateUser(updatedUser);
+      setIs2FAEnabled(!is2FAEnabled);
+      toast.success(`2FA ${!is2FAEnabled ? 'enabled' : 'disabled'} successfully`);
     } catch (error) {
       toast.error('Failed to update 2FA status');
     } finally {
@@ -50,75 +42,24 @@ const CustomerSettings = () => {
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
 
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image must be less than 5MB');
       return;
     }
 
-    const formData = new FormData();
-    formData.append('image', file);
-
     setIsUploadingImage(true);
     try {
-      const res = await fetch('/api/customer/settings/profile-picture', {
-        method: 'POST',
-        headers: { 
-          Authorization: `Bearer ${token}` 
-        },
-        body: formData
-      });
-
-      if (res.ok) {
-        const { imageUrl } = await res.json();
-        if (user) {
-          updateUser({ ...user, profilePicture: imageUrl });
-        }
-        toast.success('Profile picture updated!');
-      } else {
-        throw new Error('Upload failed');
-      }
+      const imageUrl = await storageService.uploadFile(file, `profiles/${user.id}/${file.name}`);
+      const updatedUser = { ...user, profilePicture: imageUrl };
+      await storageService.saveUser(updatedUser);
+      updateUser(updatedUser);
+      toast.success('Profile picture updated!');
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || 'Failed to upload image');
     } finally {
       setIsUploadingImage(false);
-    }
-  };
-
-  const handleUpdatePin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pin.length !== 4) {
-      toast.error('PIN must be 4 digits');
-      return;
-    }
-    if (pin !== confirmPin) {
-      toast.error('PINs do not match');
-      return;
-    }
-
-    setIsUpdatingPin(true);
-    try {
-      const res = await fetch('/api/customer/settings/pin', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ pin })
-      });
-
-      if (res.ok) {
-        toast.success('Transaction PIN updated!');
-        setPin('');
-        setConfirmPin('');
-      } else {
-        throw new Error('Failed to update PIN');
-      }
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setIsUpdatingPin(false);
     }
   };
 
@@ -203,37 +144,6 @@ const CustomerSettings = () => {
         </div>
 
         <div className="md:col-span-2 space-y-8">
-          {/* Security Section */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center gap-3">
-              <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center">
-                <Lock className="h-5 w-5 text-emerald-500" />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900">Transaction Security</h3>
-                <p className="text-xs text-slate-500">Update your 4-digit transaction PIN</p>
-              </div>
-            </div>
-            
-            <div className="p-8 space-y-6">
-              <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 flex gap-4">
-                <ShieldCheck className="h-6 w-6 text-amber-600 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-bold text-amber-900">Transfer PIN Restricted</p>
-                  <p className="text-xs text-amber-700 leading-relaxed mt-1">
-                    For enhanced security, Transfer PINs can only be reset by a bank administrator. 
-                    If you have forgotten your PIN or need to change it, please contact our support team.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-100 rounded-3xl">
-                <Lock className="h-12 w-12 text-slate-200 mb-4" />
-                <p className="text-sm font-medium text-slate-400">PIN Management is handled by Admin</p>
-              </div>
-            </div>
-          </div>
-
           {/* Account Details */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
             <h3 className="font-bold text-slate-900 mb-6">Bank Account Details</h3>

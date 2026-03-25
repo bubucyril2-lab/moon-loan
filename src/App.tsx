@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { firebaseService } from './services/firebaseService';
 
 // Public Pages
 import Home from './pages/public/Home';
@@ -10,6 +11,7 @@ import Services from './pages/public/Services';
 import Contact from './pages/public/Contact';
 import Login from './pages/public/Login';
 import Register from './pages/public/Register';
+import ForgotPassword from './pages/public/ForgotPassword';
 
 // Dashboard Layouts
 import CustomerLayout from './components/layout/CustomerLayout';
@@ -32,6 +34,7 @@ import AdminLoans from './pages/admin/Loans';
 import AdminSettings from './pages/admin/Settings';
 import AdminAuditLogs from './pages/admin/AuditLogs';
 import AdminPaymentMethods from './pages/admin/PaymentMethods';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; role?: 'admin' | 'customer' }> = ({ children, role }) => {
   const { user, isLoading } = useAuth();
@@ -44,11 +47,16 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; role?: 'admin' | 'cu
 };
 
 export default function App() {
+  useEffect(() => {
+    firebaseService.testConnection();
+  }, []);
+
   return (
-    <AuthProvider>
-      <Router>
-          <Toaster position="top-right" />
-          <Routes>
+    <ErrorBoundary>
+      <AuthProvider>
+        <Router>
+            <Toaster position="top-right" />
+            <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
@@ -56,6 +64,7 @@ export default function App() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
 
             {/* Customer Routes */}
             <Route path="/dashboard" element={
@@ -90,6 +99,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

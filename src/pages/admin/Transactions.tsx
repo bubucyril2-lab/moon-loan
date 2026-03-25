@@ -14,9 +14,11 @@ import { useAuth } from '../../context/AuthContext';
 import { format } from 'date-fns';
 import { safeFormat } from '../../utils/date';
 
+import { storageService } from '../../services/storage';
+
 interface AdminTransaction {
-  id: number;
-  account_id: number;
+  id: string;
+  account_id: string;
   account_number: string;
   full_name: string;
   type: 'credit' | 'debit';
@@ -27,18 +29,33 @@ interface AdminTransaction {
 }
 
 const AdminTransactions = () => {
-  const { token } = useAuth();
   const [transactions, setTransactions] = useState<AdminTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   const fetchAllTransactions = async () => {
     try {
-      const res = await fetch('/api/admin/transactions', {
-        headers: { Authorization: `Bearer ${token}` }
+      const allTx = await storageService.getTransactions();
+      const accounts = await storageService.getAccounts();
+      const users = await storageService.getUsers();
+
+      const enrichedTx = allTx.map(tx => {
+        const account = accounts.find(a => a.id === tx.accountId);
+        const user = account ? users.find(u => u.id === account.userId) : null;
+        return {
+          id: tx.id,
+          account_id: tx.accountId,
+          account_number: account?.account_number || account?.accountNumber || 'N/A',
+          full_name: user?.full_name || user?.fullName || 'Unknown',
+          type: tx.type,
+          amount: tx.amount,
+          description: tx.description,
+          status: tx.status,
+          created_at: tx.created_at || tx.createdAt || ''
+        };
       });
-      const data = await res.json();
-      setTransactions(data);
+
+      setTransactions(enrichedTx.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
     } catch (error) {
       console.error(error);
     } finally {
@@ -48,7 +65,7 @@ const AdminTransactions = () => {
 
   useEffect(() => {
     fetchAllTransactions();
-  }, [token]);
+  }, []);
 
   const filteredTransactions = transactions.filter(tx => 
     tx.full_name.toLowerCase().includes(search.toLowerCase()) ||
