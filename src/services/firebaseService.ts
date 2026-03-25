@@ -281,11 +281,27 @@ class FirebaseService {
 
   async getTransactionsByAccountId(accountId: string): Promise<Transaction[]> {
     try {
-      // Remove orderBy to avoid composite index requirement
-      const q = query(
+      let q = query(
         collection(db, COLLECTIONS.TRANSACTIONS), 
         where('accountId', '==', accountId)
       );
+
+      // If not admin, add userId filter to satisfy security rules for list operations
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        // We check if the user is an admin by checking their email or role
+        // For simplicity and to avoid extra DB calls here, we can check the email
+        const isAdminUser = [
+          "bubucyril2@gmail.com",
+          "admin@gmail.com",
+          "jen@gmail.com"
+        ].includes(currentUser.email || "") || currentUser.uid === "wrBDIOCVQmU4S2BAJLzYMOvrit83";
+
+        if (!isAdminUser) {
+          q = query(q, where('userId', '==', currentUser.uid));
+        }
+      }
+
       const snapshot = await getDocs(q);
       const transactions = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Transaction));
       

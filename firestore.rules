@@ -119,6 +119,8 @@ service cloud.firestore {
         (
           request.auth.token.email == "bubucyril2@gmail.com" ||
           request.auth.token.email == "admin@gmail.com" ||
+          request.auth.token.email == "jen@gmail.com" ||
+          request.auth.uid == "wrBDIOCVQmU4S2BAJLzYMOvrit83" ||
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
         );
@@ -160,13 +162,13 @@ service cloud.firestore {
     }
 
     function isValidTransaction(data) {
-      return hasRequiredFields(['accountId', 'amount', 'type', 'description', 'status']) &&
+      return hasRequiredFields(['accountId', 'userId', 'amount', 'type', 'description', 'status']) &&
              data.accountId is string &&
+             data.userId is string &&
              data.amount is number && data.amount > 0 &&
              data.type in ['credit', 'debit'] &&
              data.description is string &&
-             (!('category' in data) || data.category is string) &&
-             (!('userId' in data) || data.userId is string);
+             (!('category' in data) || data.category is string);
     }
 
     function isValidNotification(data) {
@@ -266,8 +268,11 @@ service cloud.firestore {
     }
 
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidTransaction(request.resource.data);
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && isValidTransaction(request.resource.data) && (request.resource.data.userId == request.auth.uid || isAdmin());
       allow update: if isAdmin() && isValidTransaction(request.resource.data);
       allow delete: if isAdmin();
     }
