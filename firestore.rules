@@ -145,15 +145,17 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return (hasRequiredFields(['fullName', 'email', 'role', 'status']) || hasRequiredFields(['full_name', 'email', 'role', 'status'])) &&
+      return (data.keys().hasAny(['fullName', 'full_name'])) &&
+             data.keys().hasAll(['email', 'role', 'status']) &&
              isValidEmail(data.email) &&
              data.role in ['admin', 'customer'] &&
              data.status in ['pending', 'active', 'disabled'];
     }
 
     function isValidAccount(data) {
-      return (hasRequiredFields(['userId', 'accountNumber', 'balance']) || hasRequiredFields(['userId', 'account_number', 'balance'])) &&
-             data.userId is string &&
+      return (data.keys().hasAny(['userId', 'user_id'])) &&
+             (data.keys().hasAny(['accountNumber', 'account_number'])) &&
+             data.keys().hasAll(['balance']) &&
              data.balance is number && data.balance >= 0;
     }
 
@@ -246,15 +248,19 @@ service cloud.firestore {
     }
 
     match /accounts/{accountId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('user_id', '') == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && 
-                    (isAdmin() || (request.resource.data.userId == request.auth.uid && request.resource.data.balance == 0 && request.resource.data.status == 'active')) && 
+                    (isAdmin() || (
+                      (request.resource.data.get('userId', '') == request.auth.uid || request.resource.data.get('user_id', '') == request.auth.uid) && 
+                      request.resource.data.balance == 0 && 
+                      request.resource.data.status == 'active'
+                    )) && 
                     isValidAccount(request.resource.data);
       allow update: if (isAdmin() || 
                        (isAuthenticated() && 
                         (!('pin' in resource.data) || request.resource.data.pin == resource.data.pin) &&
-                        request.resource.data.userId == resource.data.userId &&
-                        request.resource.data.accountNumber == resource.data.accountNumber)) && 
+                        (request.resource.data.get('userId', '') == resource.data.get('userId', '') || request.resource.data.get('user_id', '') == resource.data.get('user_id', '')) &&
+                        (request.resource.data.get('accountNumber', '') == resource.data.get('accountNumber', '') || request.resource.data.get('account_number', '') == resource.data.get('account_number', '')))) && 
                     isValidAccount(request.resource.data);
       allow delete: if isAdmin();
     }

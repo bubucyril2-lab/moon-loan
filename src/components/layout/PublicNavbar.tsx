@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Landmark, Menu, X } from 'lucide-react';
+import GoogleTranslate from '../common/GoogleTranslate';
 
 const PublicNavbar = () => {
   const [isOpen, setIsOpen] = React.useState(false);
@@ -17,6 +18,7 @@ const PublicNavbar = () => {
           </div>
           
           <div className="hidden md:flex items-center space-x-8">
+            <GoogleTranslate />
             <Link to="/" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">Home</Link>
             <Link to="/about" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">About</Link>
             <Link to="/services" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">Services</Link>

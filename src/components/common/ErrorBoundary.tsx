@@ -17,6 +17,10 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   public static getDerivedStateFromError(error: Error): State {
+    // Ignore generic "Script error." which is often caused by cross-origin scripts in iframes
+    if (error.message === 'Script error.') {
+      return { hasError: false, error: null };
+    }
     return { hasError: true, error };
   }
 

@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import NotificationCenter from '../NotificationCenter';
+import GoogleTranslate from '../common/GoogleTranslate';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -106,6 +107,7 @@ const CustomerLayout = () => {
           </button>
 
           <div className="flex items-center gap-4">
+            <GoogleTranslate />
             <NotificationCenter />
             <button
               onClick={handleLogout}

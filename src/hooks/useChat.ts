@@ -11,17 +11,14 @@ export const useChat = (otherUserId?: string) => {
   useEffect(() => {
     if (!user || !otherUserId) return;
 
-    const fetchHistory = async () => {
-      const targetUserId = user.role === 'admin' ? otherUserId : user.id;
-      const history = await storageService.getChatMessages(targetUserId);
-      setMessages(history);
-    };
+    const targetUserId = user.role === 'admin' ? otherUserId : user.id;
+    
+    // Use real-time listener instead of polling
+    const unsubscribe = storageService.onChatMessages(targetUserId, (newMessages) => {
+      setMessages(newMessages);
+    });
 
-    fetchHistory();
-
-    // Poll for new messages (mock real-time)
-    const interval = setInterval(fetchHistory, 2000);
-    return () => clearInterval(interval);
+    return () => unsubscribe();
   }, [user, otherUserId]);
 
   const sendMessage = useCallback(async (text: string) => {

@@ -114,10 +114,10 @@ class FirebaseService {
   async getUsers(): Promise<User[]> {
     try {
       const snapshot = await getDocs(collection(db, COLLECTIONS.USERS));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as User));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, COLLECTIONS.USERS);
-      return [];
+      throw error; // Re-throw after handling
     }
   }
 
@@ -137,7 +137,7 @@ class FirebaseService {
     try {
       const docSnap = await getDoc(doc(db, COLLECTIONS.USERS, id));
       if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as User;
+        return { ...docSnap.data(), id: docSnap.id } as User;
       }
       return undefined;
     } catch (error) {
@@ -151,7 +151,7 @@ class FirebaseService {
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
       const doc = snapshot.docs[0];
-      return { id: doc.id, ...doc.data() } as User;
+      return { ...doc.data(), id: doc.id } as User;
     }
     return undefined;
   }
@@ -168,10 +168,10 @@ class FirebaseService {
   async getAccounts(): Promise<Account[]> {
     try {
       const snapshot = await getDocs(collection(db, COLLECTIONS.ACCOUNTS));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Account));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, COLLECTIONS.ACCOUNTS);
-      return [];
+      throw error;
     }
   }
 
@@ -187,18 +187,46 @@ class FirebaseService {
     }
   }
 
+  async getAccountById(id: string): Promise<Account | undefined> {
+    try {
+      const docSnap = await getDoc(doc(db, COLLECTIONS.ACCOUNTS, id));
+      if (docSnap.exists()) {
+        return { ...docSnap.data(), id: docSnap.id } as Account;
+      }
+      return undefined;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, `${COLLECTIONS.ACCOUNTS}/${id}`);
+      return undefined;
+    }
+  }
+
   async getAccountByUserId(userId: string): Promise<Account | undefined> {
     try {
+      // Try querying by userId
       const q = query(collection(db, COLLECTIONS.ACCOUNTS), where('userId', '==', userId));
       const snapshot = await getDocs(q);
       if (!snapshot.empty) {
         const doc = snapshot.docs[0];
-        return { id: doc.id, ...doc.data() } as Account;
+        return { ...doc.data(), id: doc.id } as Account;
       }
-      return undefined;
+
+      // Fallback: Try querying by user_id (snake_case)
+      const q2 = query(collection(db, COLLECTIONS.ACCOUNTS), where('user_id', '==', userId));
+      const snapshot2 = await getDocs(q2);
+      if (!snapshot2.empty) {
+        const doc = snapshot2.docs[0];
+        return { ...doc.data(), id: doc.id } as Account;
+      }
+
+      // Final fallback: fetch all and filter in memory (only if necessary)
+      const allAccounts = await this.getAccounts();
+      const account = allAccounts.find(a => a.userId === userId || (a as any).user_id === userId);
+      return account;
     } catch (error) {
+      // Don't swallow permission denied or index errors
+      console.error('Error getting account by userId:', error);
       handleFirestoreError(error, OperationType.GET, COLLECTIONS.ACCOUNTS);
-      return undefined;
+      throw error;
     }
   }
 
@@ -213,12 +241,16 @@ class FirebaseService {
   // Transactions
   async getTransactions(): Promise<Transaction[]> {
     try {
-      const q = query(collection(db, COLLECTIONS.TRANSACTIONS), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+      const snapshot = await getDocs(collection(db, COLLECTIONS.TRANSACTIONS));
+      const transactions = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Transaction));
+      return transactions.sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.created_at || 0).getTime();
+        const dateB = new Date(b.createdAt || b.created_at || 0).getTime();
+        return dateB - dateA;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, COLLECTIONS.TRANSACTIONS);
-      return [];
+      throw error;
     }
   }
 
@@ -249,13 +281,20 @@ class FirebaseService {
 
   async getTransactionsByAccountId(accountId: string): Promise<Transaction[]> {
     try {
+      // Remove orderBy to avoid composite index requirement
       const q = query(
         collection(db, COLLECTIONS.TRANSACTIONS), 
-        where('accountId', '==', accountId),
-        orderBy('createdAt', 'desc')
+        where('accountId', '==', accountId)
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+      const transactions = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Transaction));
+      
+      // Sort in memory
+      return transactions.sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.created_at || 0).getTime();
+        const dateB = new Date(b.createdAt || b.created_at || 0).getTime();
+        return dateB - dateA;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, COLLECTIONS.TRANSACTIONS);
       return [];
@@ -277,22 +316,29 @@ class FirebaseService {
   async getNotifications(): Promise<Notification[]> {
     try {
       const snapshot = await getDocs(collection(db, COLLECTIONS.NOTIFICATIONS));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Notification));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, COLLECTIONS.NOTIFICATIONS);
-      return [];
+      throw error;
     }
   }
 
   async getNotificationsByUserId(userId: string): Promise<Notification[]> {
     try {
+      // Remove orderBy to avoid composite index requirement
       const q = query(
         collection(db, COLLECTIONS.NOTIFICATIONS), 
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
+        where('userId', '==', userId)
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+      const notifications = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Notification));
+      
+      // Sort in memory
+      return notifications.sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.created_at || 0).getTime();
+        const dateB = new Date(b.createdAt || b.created_at || 0).getTime();
+        return dateB - dateA;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, COLLECTIONS.NOTIFICATIONS);
       return [];
@@ -334,17 +380,23 @@ class FirebaseService {
     try {
       let q;
       if (userId) {
+        // Remove orderBy to avoid composite index requirement
         q = query(
           collection(db, COLLECTIONS.CHAT_MESSAGES), 
-          where('userId', '==', userId),
-          orderBy('createdAt', 'asc')
+          where('userId', '==', userId)
         );
       } else {
-        // Only admins should call this without userId, but rules will protect it anyway
-        q = query(collection(db, COLLECTIONS.CHAT_MESSAGES), orderBy('createdAt', 'asc'));
+        q = query(collection(db, COLLECTIONS.CHAT_MESSAGES));
       }
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) } as ChatMessage));
+      const messages = snapshot.docs.map(doc => ({ ...(doc.data() as any), id: doc.id } as ChatMessage));
+      
+      // Sort in memory
+      return messages.sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        return dateA - dateB;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, COLLECTIONS.CHAT_MESSAGES);
       return [];
@@ -359,10 +411,35 @@ class FirebaseService {
     });
   }
 
+  onChatMessages(userId: string | undefined, callback: (messages: ChatMessage[]) => void) {
+    let q;
+    if (userId) {
+      q = query(
+        collection(db, COLLECTIONS.CHAT_MESSAGES), 
+        where('userId', '==', userId)
+      );
+    } else {
+      q = query(collection(db, COLLECTIONS.CHAT_MESSAGES));
+    }
+
+    return onSnapshot(q, (snapshot) => {
+      const messages = snapshot.docs.map(doc => ({ ...(doc.data() as any), id: doc.id } as ChatMessage));
+      // Sort in memory to avoid composite index requirement
+      const sortedMessages = messages.sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        return dateA - dateB;
+      });
+      callback(sortedMessages);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, COLLECTIONS.CHAT_MESSAGES);
+    });
+  }
+
   // Beneficiaries
   async getBeneficiaries(): Promise<Beneficiary[]> {
     const snapshot = await getDocs(collection(db, COLLECTIONS.BENEFICIARIES));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Beneficiary));
+    return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Beneficiary));
   }
 
   async saveBeneficiary(beneficiary: Beneficiary): Promise<void> {
@@ -380,14 +457,18 @@ class FirebaseService {
   async getBeneficiariesByUserId(userId: string): Promise<Beneficiary[]> {
     const q = query(collection(db, COLLECTIONS.BENEFICIARIES), where('userId', '==', userId));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Beneficiary));
+    return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Beneficiary));
   }
 
   // Contact Messages
   async getContactMessages(): Promise<ContactMessage[]> {
-    const q = query(collection(db, COLLECTIONS.CONTACT_MESSAGES), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContactMessage));
+    const snapshot = await getDocs(collection(db, COLLECTIONS.CONTACT_MESSAGES));
+    const messages = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ContactMessage));
+    return messages.sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
   }
 
   async saveContactMessage(message: ContactMessage): Promise<void> {
@@ -400,9 +481,13 @@ class FirebaseService {
   // Audit Logs
   async getAuditLogs(): Promise<any[]> {
     try {
-      const q = query(collection(db, COLLECTIONS.AUDIT_LOGS), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const snapshot = await getDocs(collection(db, COLLECTIONS.AUDIT_LOGS));
+      const logs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
+      return logs.sort((a: any, b: any) => {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        return dateB - dateA;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, COLLECTIONS.AUDIT_LOGS);
       return [];
@@ -423,7 +508,7 @@ class FirebaseService {
   // Payment Methods
   async getPaymentMethods(): Promise<any[]> {
     const snapshot = await getDocs(collection(db, COLLECTIONS.PAYMENT_METHODS));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
   }
 
   async savePaymentMethod(method: any): Promise<void> {
@@ -466,10 +551,32 @@ class FirebaseService {
   async getLoans(): Promise<Loan[]> {
     try {
       const snapshot = await getDocs(collection(db, COLLECTIONS.LOANS));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Loan));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, COLLECTIONS.LOANS);
-      return [];
+      throw error;
+    }
+  }
+
+  async getLoansByUserId(userId: string): Promise<Loan[]> {
+    try {
+      const q = query(collection(db, COLLECTIONS.LOANS), where('userId', '==', userId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Loan));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, COLLECTIONS.LOANS);
+      throw error;
+    }
+  }
+
+  async getDepositsByUserId(userId: string): Promise<Deposit[]> {
+    try {
+      const q = query(collection(db, COLLECTIONS.DEPOSITS), where('userId', '==', userId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Deposit));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, COLLECTIONS.DEPOSITS);
+      throw error;
     }
   }
 
@@ -507,10 +614,10 @@ class FirebaseService {
   async getDeposits(): Promise<Deposit[]> {
     try {
       const snapshot = await getDocs(collection(db, COLLECTIONS.DEPOSITS));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Deposit));
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Deposit));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, COLLECTIONS.DEPOSITS);
-      return [];
+      throw error;
     }
   }
 

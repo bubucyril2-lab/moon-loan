@@ -77,8 +77,6 @@ const AdminPaymentMethods = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this payment method?')) return;
-
     try {
       await storageService.deletePaymentMethod(id);
       toast.success('Payment method deleted');

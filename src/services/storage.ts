@@ -58,6 +58,10 @@ class StorageService {
     return await firebaseService.getAccountByUserId(userId);
   }
 
+  async getAccountById(id: string): Promise<Account | undefined> {
+    return await firebaseService.getAccountById(id);
+  }
+
   async deleteAccount(id: string): Promise<void> {
     await firebaseService.deleteAccount(id);
   }
@@ -105,6 +109,10 @@ class StorageService {
     await firebaseService.saveChatMessage(message);
   }
 
+  onChatMessages(userId: string | undefined, callback: (messages: ChatMessage[]) => void) {
+    return firebaseService.onChatMessages(userId, callback);
+  }
+
   // Deposits
   async getDeposits(): Promise<Deposit[]> {
     return await firebaseService.getDeposits();
@@ -121,6 +129,14 @@ class StorageService {
 
   async saveLoan(loan: Loan): Promise<void> {
     await firebaseService.saveLoan(loan);
+  }
+
+  async getLoansByUserId(userId: string): Promise<Loan[]> {
+    return await firebaseService.getLoansByUserId(userId);
+  }
+
+  async getDepositsByUserId(userId: string): Promise<Deposit[]> {
+    return await firebaseService.getDepositsByUserId(userId);
   }
 
   async deleteLoansByUserId(userId: string): Promise<void> {

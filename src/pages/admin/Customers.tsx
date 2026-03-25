@@ -28,6 +28,7 @@ interface Customer {
   full_name: string;
   status: string;
   account_number: string;
+  accountId?: string;
   balance: number;
   created_at: string;
   pin?: string;
@@ -67,18 +68,20 @@ const AdminCustomers = () => {
   });
 
   const fetchCustomers = async () => {
+    setIsLoading(true);
     try {
       const users = (await storageService.getUsers()).filter(u => u.role === 'customer');
       const accounts = await storageService.getAccounts();
       
       const customerData = users.map(u => {
-        const account = accounts.find(a => a.userId === u.id);
+        const account = accounts.find(a => a.userId === u.id || (a as any).user_id === u.id);
         return {
           id: u.id,
           email: u.email,
           full_name: u.full_name || u.fullName || '',
           status: u.status,
           account_number: account?.accountNumber || account?.account_number || '',
+          accountId: account?.id,
           balance: account?.balance || 0,
           created_at: u.created_at || u.createdAt || '',
           pin: account?.pin
@@ -95,25 +98,50 @@ const AdminCustomers = () => {
   const fetchCustomerDetails = async (id: string) => {
     setIsLoadingDetails(true);
     try {
-      const customer = await storageService.getUserById(id);
-      const account = await storageService.getAccountByUserId(id);
-      const transactions = account ? await storageService.getTransactionsByAccountId(account.id) : [];
-      const loans = (await storageService.getLoans()).filter(l => l.userId === id);
+      const [customer, account, loans] = await Promise.all([
+        storageService.getUserById(id),
+        storageService.getAccountByUserId(id),
+        storageService.getLoansByUserId(id)
+      ]);
 
-      if (!customer || !account) throw new Error('Customer not found');
+      if (!customer) {
+        throw new Error('User record not found');
+      }
+
+      // If account is missing, we'll use a default object to avoid crashing
+      const safeAccount = account || {
+        id: 'no-account',
+        accountNumber: 'N/A',
+        account_number: 'N/A',
+        balance: 0,
+        pin: 'Not Set'
+      };
+
+      const transactions = account 
+        ? await storageService.getTransactionsByAccountId(account.id)
+        : [];
+      
+      const sortedTransactions = [...transactions].sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.created_at || 0).getTime();
+        const dateB = new Date(b.createdAt || b.created_at || 0).getTime();
+        return dateB - dateA;
+      });
 
       setShowDetailsModal({
         customer: {
           ...customer,
-          account_number: account.accountNumber || account.account_number,
-          balance: account.balance,
-          pin: account.pin
+          accountId: safeAccount.id,
+          account_number: safeAccount.accountNumber || safeAccount.account_number,
+          balance: safeAccount.balance,
+          pin: safeAccount.pin
         },
-        transactions: transactions.sort((a, b) => new Date(b.createdAt || b.created_at || '').getTime() - new Date(a.createdAt || a.created_at || '').getTime()),
+        transactions: sortedTransactions,
         loans
       });
-    } catch (error) {
-      toast.error('Failed to fetch customer details');
+    } catch (error: any) {
+      console.error('Error fetching customer details:', error);
+      const errorMessage = error.message || 'Failed to fetch customer details';
+      toast.error(`Error: ${errorMessage}`);
     } finally {
       setIsLoadingDetails(false);
     }
@@ -129,13 +157,31 @@ const AdminCustomers = () => {
     setIsAdjusting(true);
 
     try {
-      const account = await storageService.getAccountByUserId(showAdjustModal.id);
-      if (!account) throw new Error('Account not found');
+      let account = showAdjustModal.accountId && showAdjustModal.accountId !== 'no-account'
+        ? await storageService.getAccountById(showAdjustModal.accountId)
+        : await storageService.getAccountByUserId(showAdjustModal.id);
+        
+      if (!account) {
+        // Create an account if missing
+        const newAccount = {
+          id: Math.random().toString(36).substr(2, 9),
+          userId: showAdjustModal.id,
+          accountNumber: '30' + Math.floor(Math.random() * 9000000000),
+          balance: 0,
+          status: 'active',
+          createdAt: new Date().toISOString()
+        };
+        await storageService.saveAccount(newAccount);
+        account = newAccount;
+      }
 
       const amount = parseFloat(adjustAmount);
-      const newBalance = adjustType === 'credit' ? account.balance + amount : account.balance - amount;
+      if (isNaN(amount) || amount <= 0) throw new Error('Please enter a valid amount greater than 0');
 
-      if (newBalance < 0) throw new Error('Insufficient balance');
+      const currentBalance = Number(account.balance) || 0;
+      const newBalance = adjustType === 'credit' ? currentBalance + amount : currentBalance - amount;
+
+      if (newBalance < 0) throw new Error('Insufficient balance for this debit operation');
 
       await storageService.saveAccount({ ...account, balance: newBalance });
       
@@ -176,7 +222,14 @@ const AdminCustomers = () => {
       setAdjustDescription('');
       fetchCustomers();
     } catch (error: any) {
-      toast.error(error.message);
+      let message = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        message = parsed.error || error.message;
+      } catch (e) {
+        // Not a JSON string
+      }
+      toast.error(message);
     } finally {
       setIsAdjusting(false);
     }
@@ -211,8 +264,8 @@ const AdminCustomers = () => {
 
       toast.success(`Customer ${status}`);
       fetchCustomers();
-    } catch (error) {
-      toast.error('Update failed');
+    } catch (error: any) {
+      toast.error(error.message || 'Update failed');
     }
   };
 
@@ -246,8 +299,8 @@ const AdminCustomers = () => {
       toast.success('Customer profile updated');
       setShowEditModal(null);
       fetchCustomers();
-    } catch (error) {
-      toast.error('Update failed');
+    } catch (error: any) {
+      toast.error(error.message || 'Update failed');
     } finally {
       setIsUpdating(false);
     }
@@ -280,8 +333,8 @@ const AdminCustomers = () => {
       toast.success('Message sent successfully');
       setShowMessageModal(null);
       setMessageForm({ title: '', message: '', type: 'info' });
-    } catch (error) {
-      toast.error('Failed to send message');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to send message');
     } finally {
       setIsSending(false);
     }
@@ -292,8 +345,13 @@ const AdminCustomers = () => {
     if (!showResetPinModal || !user) return;
     setIsResetting(true);
     try {
-      const account = await storageService.getAccountByUserId(showResetPinModal.id);
+      const account = showResetPinModal.accountId 
+        ? await storageService.getAccountById(showResetPinModal.accountId)
+        : await storageService.getAccountByUserId(showResetPinModal.id);
+        
       if (!account) throw new Error('Account not found');
+
+      if (!newPin || newPin.length < 4) throw new Error('Please enter a valid 4-6 digit PIN');
 
       await storageService.saveAccount({ ...account, pin: newPin });
 
@@ -319,8 +377,15 @@ const AdminCustomers = () => {
       toast.success('Transfer PIN reset successfully');
       setShowResetPinModal(null);
       setNewPin('');
-    } catch (error) {
-      toast.error('Failed to reset PIN');
+    } catch (error: any) {
+      let message = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        message = parsed.error || error.message;
+      } catch (e) {
+        // Not a JSON string
+      }
+      toast.error(message || 'Failed to reset PIN');
     } finally {
       setIsResetting(false);
     }
@@ -328,13 +393,13 @@ const AdminCustomers = () => {
 
   const handleToggleStatus = (userId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'disabled' : 'active';
-    if (!window.confirm(`Are you sure you want to ${newStatus === 'active' ? 'enable' : 'disable'} this account?`)) return;
-
+    
     setIsUpdatingStatus(true);
     try {
       handleStatusUpdate(userId, newStatus);
       fetchCustomerDetails(userId);
       fetchCustomers();
+      toast.success(`Account ${newStatus === 'active' ? 'enabled' : 'disabled'} successfully`);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
