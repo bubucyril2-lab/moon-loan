@@ -364,15 +364,15 @@ const CustomerSettings = () => {
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bank Name</span>
-                      <span className="text-sm font-bold text-slate-900">Moonstone Saving Bank</span>
+                      <span className="text-sm font-bold text-slate-900">ECONEST BANK</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">SWIFT / BIC</span>
-                      <span className="text-sm font-mono font-bold text-slate-900">MOONUS33XXX</span>
+                      <span className="text-sm font-mono font-bold text-slate-900">ECONUS33XXX</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">IBAN</span>
-                      <span className="text-sm font-mono font-bold text-slate-900">US76 MOON 0000 1234 5678 90</span>
+                      <span className="text-sm font-mono font-bold text-slate-900">US76 ECON 0000 1234 5678 90</span>
                     </div>
                   </div>
                   <p className="text-[10px] text-slate-400 text-center italic">Use these details for international wire transfers.</p>
@@ -389,7 +389,7 @@ const CustomerSettings = () => {
                   </div>
                   <div className="flex justify-between py-3 border-b border-slate-50">
                     <span className="text-sm text-slate-500">Membership Type</span>
-                    <span className="text-sm font-bold text-slate-900">Moonstone Premium</span>
+                    <span className="text-sm font-bold text-slate-900">ECONEST Premium</span>
                   </div>
                   <div className="flex justify-between items-center py-3">
                     <div className="flex flex-col">

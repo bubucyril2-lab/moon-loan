@@ -70,7 +70,7 @@ const CustomerLayout = () => {
         <div className="flex flex-col h-full">
           <Link to="/dashboard" className="p-6 flex items-center gap-3">
             <Landmark className="h-8 w-8 text-emerald-500" />
-            <span className="text-xl font-bold text-white tracking-tight">MOONSTONE</span>
+            <span className="text-xl font-bold text-white tracking-tight">ECONEST BANK</span>
           </Link>
 
           <nav className="flex-1 px-4 py-4 space-y-2">

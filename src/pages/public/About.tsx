@@ -6,11 +6,11 @@ const About = () => {
     <div className="min-h-screen bg-slate-50">
       <PublicNavbar />
       <div className="max-w-7xl mx-auto px-4 py-20">
-        <h1 className="text-4xl font-bold text-slate-900 mb-8 text-center">About Moonstone Bank</h1>
+        <h1 className="text-4xl font-bold text-slate-900 mb-8 text-center">About ECONEST BANK</h1>
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
             <p className="text-lg text-slate-600 mb-6 leading-relaxed">
-              Founded in 2026, Moonstone Saving Bank was built with a single mission: to redefine the digital banking experience. 
+              Founded in 2026, ECONEST BANK was built with a single mission: to redefine the digital banking experience. 
               We believe that banking should be transparent, secure, and accessible to everyone, everywhere.
             </p>
             <p className="text-lg text-slate-600 mb-6 leading-relaxed">

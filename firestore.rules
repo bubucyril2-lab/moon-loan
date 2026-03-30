@@ -66,10 +66,11 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          request.auth.token.email == "bubucyril2@gmail.com" ||
-          request.auth.token.email == "admin@gmail.com" ||
-          request.auth.token.email == "admin@moonstone.com");
+        (request.auth.token.email == "bubucyril2@gmail.com" ||
+         request.auth.token.email == "admin@gmail.com" ||
+         request.auth.token.email == "admin@econestbank.com" ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
 
     function hasRequiredFields(fields) {
@@ -132,11 +133,19 @@ service cloud.firestore {
     }
 
     match /accounts/{accountId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
-      allow create: if isAdmin() && isValidAccount(request.resource.data);
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        resource.data.userId == request.auth.uid ||
+        // Allow querying by accountNumber for transfers
+        (request.query.limit <= 1 && request.query.filters.accountNumber != null)
+      );
+      allow create: if isAuthenticated() && (
+        isAdmin() || 
+        (request.resource.data.userId == request.auth.uid && isValidAccount(request.resource.data))
+      );
       allow update: if isAuthenticated() && (
         isAdmin() || 
-        (isOwner(resource.data.userId) && 
+        (resource.data.userId == request.auth.uid && 
          isValidAccount(request.resource.data) && 
          request.resource.data.userId == resource.data.userId &&
          request.resource.data.accountNumber == resource.data.accountNumber)

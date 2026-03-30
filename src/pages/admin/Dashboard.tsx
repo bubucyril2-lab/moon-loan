@@ -171,7 +171,7 @@ const AdminDashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Welcome back, {user?.fullName || 'Admin'}</h2>
-          <p className="text-slate-500">Here's what's happening with Moonstone Saving Bank today.</p>
+          <p className="text-slate-500">Here's what's happening with ECONEST BANK today.</p>
         </div>
         <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
           <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>

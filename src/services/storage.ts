@@ -173,14 +173,12 @@ class StorageService {
         q = query(
           collection(db, 'transactions'), 
           where('userId', '==', userId),
-          where('accountId', '==', accountId),
-          orderBy('createdAt', 'desc')
+          where('accountId', '==', accountId)
         );
       } else {
         q = query(
           collection(db, 'transactions'), 
-          where('accountId', '==', accountId),
-          orderBy('createdAt', 'desc')
+          where('accountId', '==', accountId)
         );
       }
       const snapshot = await getDocs(q);

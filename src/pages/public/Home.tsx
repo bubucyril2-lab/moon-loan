@@ -15,7 +15,7 @@ const Home = () => {
         {/* Background Image with Overlay */}
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1920&q=80" 
+            src="https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1920&q=80" 
             alt="Hero Background" 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
@@ -35,7 +35,7 @@ const Home = () => {
               </h1>
               <p className="text-xl text-slate-200 mb-8 leading-relaxed max-w-2xl">
                 Experience secure, transparent, and lightning-fast digital banking. 
-                Manage your wealth with Moonstone Saving Bank's advanced financial tools.
+                Manage your wealth with ECONEST BANK's advanced financial tools.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link to="/register" className="bg-emerald-500 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-emerald-600 transition-all shadow-lg flex items-center justify-center gap-2 group">
@@ -55,7 +55,7 @@ const Home = () => {
       <section className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-slate-900 mb-4">Why Choose Moonstone?</h2>
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">Why Choose ECONEST BANK?</h2>
             <p className="text-slate-600 max-w-2xl mx-auto">We combine traditional security with modern technology to give you the best banking experience.</p>
           </div>
           
@@ -123,7 +123,7 @@ const Home = () => {
       <section className="py-24 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-slate-900 mb-4">How It Works</h2>
-          <p className="text-slate-600 max-w-2xl mx-auto mb-16">Get started with Moonstone in three simple steps.</p>
+          <p className="text-slate-600 max-w-2xl mx-auto mb-16">Get started with ECONEST BANK in three simple steps.</p>
           
           <div className="grid md:grid-cols-3 gap-12 relative">
             {/* Connection Line (Desktop) */}
@@ -200,7 +200,7 @@ const Home = () => {
           
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { name: 'Sarah Johnson', role: 'Business Owner', text: 'Moonstone has completely changed how I manage my business finances. The instant transfers are a lifesaver.' },
+              { name: 'Sarah Johnson', role: 'Business Owner', text: 'ECONEST BANK has completely changed how I manage my business finances. The instant transfers are a lifesaver.' },
               { name: 'Michael Chen', role: 'Freelancer', text: 'The loan application process was incredibly smooth. I received my funds within hours of approval.' },
               { name: 'Elena Rodriguez', role: 'Tech Professional', text: 'Best digital banking experience I\'ve ever had. The UI is clean, fast, and very secure.' }
             ].map((t, i) => (
@@ -233,7 +233,7 @@ const Home = () => {
             {[
               { q: 'How do I open an account?', a: 'You can open an account by clicking the "Get Started" button and filling out our simple registration form. You\'ll need to provide some basic information and verify your identity.' },
               { q: 'What are the loan requirements?', a: 'To apply for a loan, you must be a registered member with an active account. Requirements vary based on the loan amount and plan chosen.' },
-              { q: 'Is my money safe with Moonstone?', a: 'Yes, we use industry-standard encryption and security protocols to protect your assets and personal information. We are a registered financial institution.' },
+              { q: 'Is my money safe with ECONEST BANK?', a: 'Yes, we use industry-standard encryption and security protocols to protect your assets and personal information. We are a registered financial institution.' },
               { q: 'How long does loan approval take?', a: 'Our automated system processes applications quickly. Most loans are reviewed and approved within 24 hours.' }
             ].map((faq, i) => (
               <details key={i} className="group bg-slate-50 rounded-2xl border border-slate-100 p-6 cursor-pointer">
@@ -259,11 +259,11 @@ const Home = () => {
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-6">
                 <Landmark className="h-8 w-8 text-emerald-500" />
-                <span className="text-xl font-bold text-white tracking-tight">MOONSTONE</span>
+                <span className="text-xl font-bold text-white tracking-tight">ECONEST BANK</span>
               </div>
               <p className="max-w-sm mb-6">
                 Empowering individuals and businesses with modern financial solutions. 
-                Moonstone Saving Bank is a registered financial institution providing secure digital banking and instant loans.
+                ECONEST BANK is a registered financial institution providing secure digital banking and instant loans.
               </p>
               <div className="flex gap-4">
                 {/* Social placeholders */}
@@ -295,7 +295,7 @@ const Home = () => {
             </div>
           </div>
           <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm">
-            <p>&copy; 2026 Moonstone Saving Bank. All rights reserved.</p>
+            <p>&copy; 2026 ECONEST BANK. All rights reserved.</p>
             <p className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-emerald-500" />
               Regulated by Financial Conduct Authority

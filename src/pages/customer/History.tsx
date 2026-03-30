@@ -33,7 +33,7 @@ const CustomerHistory = () => {
         const account = await storageService.getAccountByUserId(user.id);
         if (account) {
           const txs = await storageService.getTransactionsByAccountId(account.id, user.id);
-          setTransactions(txs.sort((a, b) => new Date(b.created_at || b.createdAt || '').getTime() - new Date(a.created_at || a.createdAt || '').getTime()));
+          setTransactions(txs.sort((a, b) => new Date(b.createdAt || b.created_at || '').getTime() - new Date(a.createdAt || a.created_at || '').getTime()));
         }
       } catch (error) {
         console.error('Error fetching transactions:', error);
@@ -49,7 +49,7 @@ const CustomerHistory = () => {
     try {
       const csvContent = "data:text/csv;charset=utf-8," 
         + "Date,Description,Amount,Type,Reference\n"
-        + transactions.map(tx => `${tx.created_at},${tx.description},${tx.amount},${tx.type},${tx.reference_id || ''}`).join("\n");
+        + transactions.map(tx => `${tx.createdAt || tx.created_at},${tx.description},${tx.amount},${tx.type},${tx.reference_id || ''}`).join("\n");
       
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
@@ -71,7 +71,7 @@ const CustomerHistory = () => {
 
     if (dateFilter === 'all') return true;
     
-    const txDate = safeDate(tx.created_at);
+    const txDate = safeDate(tx.createdAt || tx.created_at);
     const now = new Date();
     
     if (dateFilter === 'today') {
@@ -177,9 +177,9 @@ const CustomerHistory = () => {
                   <td className="px-6 py-4">
                     <p className="text-sm text-slate-600 flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      {safeFormat(tx.created_at, 'MMM dd, yyyy')}
+                      {safeFormat(tx.createdAt || tx.created_at, 'MMM dd, yyyy')}
                     </p>
-                    <p className="text-xs text-slate-400">{safeFormat(tx.created_at, 'HH:mm')}</p>
+                    <p className="text-xs text-slate-400">{safeFormat(tx.createdAt || tx.created_at, 'HH:mm')}</p>
                   </td>
                   <td className="px-6 py-4">
                     <p className={`text-sm font-bold ${

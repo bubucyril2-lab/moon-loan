@@ -32,7 +32,7 @@ const ForgotPassword = () => {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link to="/" className="flex justify-center items-center gap-2 mb-6">
           <Landmark className="h-10 w-10 text-emerald-600" />
-          <span className="text-2xl font-bold text-slate-900 tracking-tight">MOONSTONE</span>
+          <span className="text-2xl font-bold text-slate-900 tracking-tight">ECONEST BANK</span>
         </Link>
         <h2 className="text-center text-3xl font-extrabold text-slate-900">Reset your password</h2>
         <p className="mt-2 text-center text-sm text-slate-600">

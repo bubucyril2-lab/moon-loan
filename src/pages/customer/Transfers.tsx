@@ -42,7 +42,7 @@ const CustomerTransfers = () => {
 
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [isAddingBeneficiary, setIsAddingBeneficiary] = useState(false);
-  const [newBeneficiary, setNewBeneficiary] = useState({ name: '', accountNumber: '', bankName: 'Moonstone Bank' });
+  const [newBeneficiary, setNewBeneficiary] = useState({ name: '', accountNumber: '', bankName: 'ECONEST BANK' });
 
   const fetchBeneficiaries = async () => {
     if (!user) return;
@@ -87,7 +87,7 @@ const CustomerTransfers = () => {
       });
       toast.success('Beneficiary added');
       setIsAddingBeneficiary(false);
-      setNewBeneficiary({ name: '', accountNumber: '', bankName: 'Moonstone Bank' });
+      setNewBeneficiary({ name: '', accountNumber: '', bankName: 'ECONEST BANK' });
       await fetchBeneficiaries();
     } catch (error) {
       toast.error('Failed to add beneficiary');
@@ -242,7 +242,7 @@ const CustomerTransfers = () => {
         </button>
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Send Money</h2>
-          <p className="text-slate-500">Transfer funds securely {transferType === 'internal' ? 'to any Moonstone account' : 'to other banks'}</p>
+          <p className="text-slate-500">Transfer funds securely {transferType === 'internal' ? 'to any ECONEST BANK account' : 'to other banks'}</p>
         </div>
       </div>
 
@@ -287,7 +287,7 @@ const CustomerTransfers = () => {
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-lg font-bold text-slate-900">Savings Premium</p>
+                  <p className="text-lg font-bold text-slate-900">ECONEST Premium</p>
                   <p className="text-sm font-mono text-slate-500">{account?.account_number}</p>
                 </div>
                 <div className="text-right">
@@ -437,7 +437,7 @@ const CustomerTransfers = () => {
                     </div>
                     <div className="flex justify-between py-3 border-b border-slate-100">
                       <span className="text-slate-500">Bank Name</span>
-                      <span className="font-bold text-slate-900">{transferType === 'internal' ? 'Moonstone Bank' : bankName}</span>
+                      <span className="font-bold text-slate-900">{transferType === 'internal' ? 'ECONEST BANK' : bankName}</span>
                     </div>
                     {transferType === 'international' && (
                       <div className="flex justify-between py-3 border-b border-slate-100">
@@ -587,7 +587,7 @@ const CustomerTransfers = () => {
             <h3 className="font-bold mb-4">Security Tip</h3>
             <p className="text-sm text-slate-400 leading-relaxed">
               Never share your transaction PIN or login credentials with anyone. 
-              Moonstone Bank will never ask for your PIN via email or phone.
+              ECONEST BANK will never ask for your PIN via email or phone.
             </p>
           </div>
         </div>

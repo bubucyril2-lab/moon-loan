@@ -20,7 +20,7 @@ const AdminSettings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [settings, setSettings] = useState({
-    bank_name: 'Moonstone Saving Bank',
+    bank_name: 'ECONEST BANK',
     maintenance_mode: 'false',
     interest_rate: '5.5',
     max_loan_amount: '50000',

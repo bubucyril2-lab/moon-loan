@@ -44,7 +44,7 @@ const Contact = () => {
                 </div>
                 <div>
                   <p className="font-bold text-slate-900">Email Us</p>
-                  <p className="text-slate-600">support@moonstone.com</p>
+                  <p className="text-slate-600">support@econestbank.com</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -53,7 +53,7 @@ const Contact = () => {
                 </div>
                 <div>
                   <p className="font-bold text-slate-900">Call Us</p>
-                  <p className="text-slate-600">+1 (800) MOON-BANK</p>
+                  <p className="text-slate-600">+1 (800) ECONEST-BANK</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">

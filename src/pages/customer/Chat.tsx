@@ -52,7 +52,7 @@ const CustomerChat = () => {
             <div className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 border-white rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
           </div>
           <div>
-            <h3 className="font-bold text-slate-900">Moonstone Support</h3>
+            <h3 className="font-bold text-slate-900">ECONEST BANK Support</h3>
             <p className="text-xs text-slate-500 flex items-center gap-1">
               {isOnline ? 'Online - Ready to help' : 'Offline - We will reply soon'}
             </p>

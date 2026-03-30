@@ -17,7 +17,7 @@ const PublicNavbar = () => {
           <div className="flex items-center">
             <Link to="/" className="flex items-center gap-2">
               <Landmark className="h-8 w-8 text-emerald-600" />
-              <span className="text-xl font-bold text-slate-900 tracking-tight">MOONSTONE</span>
+              <span className="text-xl font-bold text-slate-900 tracking-tight">ECONEST BANK</span>
             </Link>
           </div>
           

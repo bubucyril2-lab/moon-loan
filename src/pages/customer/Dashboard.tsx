@@ -171,7 +171,7 @@ const CustomerDashboard = () => {
               <div className="h-10 w-px bg-slate-700"></div>
               <div>
                 <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Account Type</p>
-                <p className="font-bold">Savings Premium</p>
+                <p className="font-bold">ECONEST Premium</p>
               </div>
             </div>
           </div>
@@ -228,6 +228,60 @@ const CustomerDashboard = () => {
         </div>
       </div>
 
+      {/* Recent Activity */}
+      <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <Clock className="h-5 w-5 text-emerald-600" />
+            Recent Transactions
+          </h3>
+          <Link 
+            to="/dashboard/history"
+            className="text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
+          >
+            View All
+          </Link>
+        </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6">
+          {transactions.slice(0, 5).map((tx) => (
+            <div key={tx.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-emerald-200 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                  tx.type === 'credit' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+                }`}>
+                  {tx.type === 'credit' ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                </div>
+                <p className={`text-sm font-bold ${
+                  tx.type === 'credit' ? 'text-emerald-600' : 'text-slate-900'
+                }`}>
+                  {tx.type === 'credit' ? '+' : '-'}${tx.amount.toLocaleString()}
+                </p>
+              </div>
+              <p className="text-sm font-bold text-slate-900 truncate mb-1">{tx.description}</p>
+              <p className="text-xs text-slate-500">{safeFormat(tx.createdAt || tx.created_at, 'MMM dd, HH:mm')}</p>
+            </div>
+          ))}
+          {transactions.length === 0 && (
+            <div className="col-span-full py-8 text-center text-slate-500 text-sm">
+              No recent transactions found.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Market Trading */}
+      <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between mb-8">
+          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-emerald-600" />
+            Live Market Trading
+          </h3>
+        </div>
+        <div className="h-[400px] w-full overflow-hidden rounded-2xl">
+          <TradingChart />
+        </div>
+      </div>
+
       {/* Modals */}
       {showModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
@@ -280,59 +334,6 @@ const CustomerDashboard = () => {
           </div>
         </div>
       )}
-
-      {/* Stats & Activity */}
-      <div className="grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-emerald-600" />
-              Live Market Trading
-            </h3>
-          </div>
-          <div className="h-[400px] w-full overflow-hidden rounded-2xl">
-            <TradingChart />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <Clock className="h-5 w-5 text-emerald-600" />
-            Recent Activity
-          </h3>
-          <div className="space-y-6">
-            {transactions.slice(0, 5).map((tx) => (
-              <div key={tx.id} className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    tx.type === 'credit' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
-                  }`}>
-                    {tx.type === 'credit' ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900 truncate max-w-[120px]">{tx.description}</p>
-                    <p className="text-xs text-slate-500">{safeFormat(tx.created_at, 'MMM dd, HH:mm')}</p>
-                  </div>
-                </div>
-                <p className={`text-sm font-bold ${
-                  tx.type === 'credit' ? 'text-emerald-600' : 'text-slate-900'
-                }`}>
-                  {tx.type === 'credit' ? '+' : '-'}${tx.amount.toLocaleString()}
-                </p>
-              </div>
-            ))}
-            {transactions.length === 0 && (
-              <p className="text-center text-slate-500 text-sm py-8">No recent transactions</p>
-            )}
-          </div>
-          <Link 
-            to="/dashboard/history"
-            className="block w-full mt-8 py-3 text-sm font-bold text-center text-slate-600 hover:text-emerald-600 transition-colors border-t border-slate-100"
-          >
-            View All Transactions
-          </Link>
-        </div>
-      </div>
     </div>
   );
 };

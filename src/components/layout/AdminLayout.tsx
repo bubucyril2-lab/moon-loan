@@ -71,7 +71,7 @@ const AdminLayout = () => {
         <div className="flex flex-col h-full">
           <Link to="/admin" className="p-6 flex items-center gap-3">
             <Landmark className="h-8 w-8 text-emerald-500" />
-            <span className="text-xl font-bold text-white tracking-tight">MOONSTONE</span>
+            <span className="text-xl font-bold text-white tracking-tight">ECONEST BANK</span>
           </Link>
 
           <div className="px-6 py-2">
