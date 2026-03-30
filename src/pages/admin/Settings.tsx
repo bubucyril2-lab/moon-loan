@@ -42,9 +42,20 @@ const AdminSettings = () => {
   }, []);
 
   const handleSave = async () => {
+    if (!user) return;
     setIsSaving(true);
     try {
       await storageService.saveSettings(settings);
+      
+      await storageService.saveAuditLog({
+        id: Math.random().toString(36).substr(2, 9),
+        adminId: user.id,
+        adminName: user.fullName || user.full_name || '',
+        action: 'system_settings_update',
+        details: `Updated system settings: ${Object.keys(settings).join(', ')}`,
+        createdAt: new Date().toISOString()
+      });
+
       toast.success('System settings updated successfully');
     } catch (error) {
       toast.error('Failed to save settings');

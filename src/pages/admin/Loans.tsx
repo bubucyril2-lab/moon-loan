@@ -3,6 +3,7 @@ import {
   Banknote, 
   CheckCircle2, 
   XCircle, 
+  X,
   Clock, 
   Search, 
   Filter,
@@ -82,6 +83,28 @@ const AdminLoans = () => {
 
       const updatedLoan = { ...loan, status };
       await storageService.saveLoan(updatedLoan);
+
+      // If approved, credit the user's account
+      if (status === 'approved') {
+        const userAccount = await storageService.getAccountByUserId(loan.userId);
+        if (userAccount) {
+          const newBalance = userAccount.balance + loan.amount;
+          await storageService.saveAccount({ ...userAccount, balance: newBalance });
+
+          // Create a transaction for the loan credit
+          await storageService.saveTransaction({
+            id: Math.random().toString(36).substr(2, 9),
+            accountId: userAccount.id,
+            userId: loan.userId,
+            type: 'credit',
+            amount: loan.amount,
+            description: `Loan Disbursement - Ref: ${loan.id}`,
+            status: 'completed',
+            createdAt: new Date().toISOString(),
+            created_at: new Date().toISOString()
+          });
+        }
+      }
 
       await storageService.saveNotification({
         id: Math.random().toString(36).substr(2, 9),
@@ -313,48 +336,50 @@ const AdminLoans = () => {
           <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative z-10">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-xl font-bold text-slate-900">Record Repayment</h3>
-              <button onClick={() => setSelectedLoan(null)} className="text-slate-400 hover:text-slate-600">
-                <XCircle className="h-6 w-6" />
+              <button onClick={() => setSelectedLoan(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X className="h-6 w-6" />
               </button>
             </div>
-            <form onSubmit={handleRepayment} className="p-8 space-y-6">
-              <div className="bg-slate-50 p-4 rounded-2xl space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Loan Amount</span>
-                  <span className="font-bold text-slate-900">${selectedLoan.amount.toLocaleString()}</span>
+            <div className="max-h-[80vh] overflow-y-auto">
+              <form onSubmit={handleRepayment} className="p-8 space-y-6">
+                <div className="bg-slate-50 p-4 rounded-2xl space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Loan Amount</span>
+                    <span className="font-bold text-slate-900">${selectedLoan.amount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Already Paid</span>
+                    <span className="font-bold text-emerald-600">${selectedLoan.paid_amount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-xs pt-2 border-t border-slate-200">
+                    <span className="text-slate-500">Remaining</span>
+                    <span className="font-bold text-slate-900">${(selectedLoan.amount - selectedLoan.paid_amount).toLocaleString()}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Already Paid</span>
-                  <span className="font-bold text-emerald-600">${selectedLoan.paid_amount.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-xs pt-2 border-t border-slate-200">
-                  <span className="text-slate-500">Remaining</span>
-                  <span className="font-bold text-slate-900">${(selectedLoan.amount - selectedLoan.paid_amount).toLocaleString()}</span>
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Repayment Amount ($)</label>
-                <input 
-                  type="number" 
-                  required
-                  min="1"
-                  max={selectedLoan.amount - selectedLoan.paid_amount}
-                  value={repaymentAmount}
-                  onChange={(e) => setRepaymentAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
-                />
-              </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Repayment Amount ($)</label>
+                  <input 
+                    type="number" 
+                    required
+                    min="1"
+                    max={selectedLoan.amount - selectedLoan.paid_amount}
+                    value={repaymentAmount}
+                    onChange={(e) => setRepaymentAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
+                  />
+                </div>
 
-              <button 
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Confirm Repayment'}
-              </button>
-            </form>
+                <button 
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Confirm Repayment'}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}

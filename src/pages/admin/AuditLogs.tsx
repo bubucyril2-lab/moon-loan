@@ -48,9 +48,9 @@ const AuditLogs = () => {
   }, []);
 
   const filteredLogs = logs.filter(log => 
-    log.admin_name.toLowerCase().includes(search.toLowerCase()) ||
-    log.action.toLowerCase().includes(search.toLowerCase()) ||
-    log.details.toLowerCase().includes(search.toLowerCase())
+    (log.adminName || log.admin_name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (log.action || '').toLowerCase().includes(search.toLowerCase()) ||
+    (log.details || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (

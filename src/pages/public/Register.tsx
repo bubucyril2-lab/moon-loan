@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Landmark, Mail, Lock, User, Loader2, AlertCircle, Globe, MapPin, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../firebase';
-import { firebaseService } from '../../services/firebaseService';
+import { firebaseAuthService } from '../../services/firebaseAuthService';
+import { db } from '../../firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import { User as UserType, Account } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 
 const Register = () => {
+  const { user, isLoading: authLoading } = useAuth();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -21,7 +22,6 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,58 +34,38 @@ const Register = () => {
     setError('');
 
     try {
-      // Create user in Firebase Auth
-      let userId: string;
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-        userId = userCredential.user.uid;
-      } catch (authErr: any) {
-        if (authErr.code === 'auth/email-already-in-use') {
-          // If user exists in Auth, try to sign in to verify ownership
-          const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
-          userId = userCredential.user.uid;
-          
-          // Check if Firestore document already exists
-          const existingUser = await firebaseService.getUserById(userId);
-          if (existingUser) {
-            throw new Error('An account with this email already exists and is fully registered. Please log in.');
-          }
-          // If document is missing, we proceed to create it (Repair mode)
-        } else {
-          throw authErr;
-        }
-      }
-      
-      const newUser: any = {
-        id: userId,
+      const registeredUser = await firebaseAuthService.register({
         email: formData.email,
+        password: formData.password,
         fullName: formData.fullName,
-        role: (formData.email === 'admin@gmail.com' || formData.email === 'bubucyril2@gmail.com') ? 'admin' : 'customer',
-        status: 'active' as const,
+        username: formData.email.split('@')[0],
+      });
+      
+      // Update additional profile info in Firestore
+      await firebaseAuthService.updateProfile(registeredUser.id, {
         country: formData.country,
         city: formData.city,
         age: parseInt(formData.age),
-        createdAt: new Date().toISOString()
-      };
+        status: 'active'
+      });
 
-      // Create initial bank account
+      // Create initial bank account in Firestore
       const accountNumber = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+      const accountId = Math.random().toString(36).substring(2, 15);
       const newAccount: Account = {
-        id: Math.random().toString(36).substring(2, 15),
-        userId: userId,
+        id: accountId,
+        userId: registeredUser.id,
         accountNumber: accountNumber,
         balance: 0,
         status: 'active',
         createdAt: new Date().toISOString()
       };
 
-      await firebaseService.saveUser(newUser);
-      await firebaseService.saveAccount(newAccount);
+      await setDoc(doc(db, 'accounts', accountId), newAccount);
 
-      login(newUser);
       toast.success('Welcome to Moonstone Saving Bank!');
       
-      if (newUser.role === 'admin') {
+      if (registeredUser.role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');

@@ -1,8 +1,23 @@
-
-import { firebaseService } from './firebaseService';
+import { 
+  db, 
+  handleFirestoreError, 
+  OperationType 
+} from '../firebase';
+import { 
+  collection, 
+  getDocs, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  onSnapshot, 
+  doc,
+  orderBy,
+  limit
+} from 'firebase/firestore';
 import { User, Account, Transaction, Notification, ChatMessage, Deposit, Loan, Beneficiary, ContactMessage } from '../types';
-import { collection, getDocs, query, where, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 
 export interface AuditLog {
   id: string;
@@ -26,178 +41,459 @@ export interface PaymentMethod {
 class StorageService {
   // Users
   async getUsers(): Promise<User[]> {
-    return await firebaseService.getUsers();
+    try {
+      const snapshot = await getDocs(collection(db, 'users'));
+      return snapshot.docs.map(doc => doc.data() as User);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'users');
+      return [];
+    }
   }
 
   async saveUser(user: User): Promise<void> {
-    await firebaseService.saveUser(user);
+    try {
+      await setDoc(doc(db, 'users', user.id), user);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `users/${user.id}`);
+    }
   }
 
   async getUserById(id: string): Promise<User | undefined> {
-    return await firebaseService.getUserById(id);
+    try {
+      const userDoc = await getDoc(doc(db, 'users', id));
+      return userDoc.exists() ? userDoc.data() as User : undefined;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, `users/${id}`);
+      return undefined;
+    }
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return await firebaseService.getUserByEmail(email);
+    try {
+      const q = query(collection(db, 'users'), where('email', '==', email.toLowerCase().trim()));
+      const snapshot = await getDocs(q);
+      return snapshot.empty ? undefined : snapshot.docs[0].data() as User;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'users');
+      return undefined;
+    }
   }
 
   async deleteUser(id: string): Promise<void> {
-    await firebaseService.deleteUser(id);
+    try {
+      await deleteDoc(doc(db, 'users', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `users/${id}`);
+    }
   }
 
   // Accounts
   async getAccounts(): Promise<Account[]> {
-    return await firebaseService.getAccounts();
+    try {
+      const snapshot = await getDocs(collection(db, 'accounts'));
+      return snapshot.docs.map(doc => doc.data() as Account);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'accounts');
+      return [];
+    }
   }
 
   async saveAccount(account: Account): Promise<void> {
-    await firebaseService.saveAccount(account);
+    try {
+      await setDoc(doc(db, 'accounts', account.id), account);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `accounts/${account.id}`);
+    }
   }
 
   async getAccountByUserId(userId: string): Promise<Account | undefined> {
-    return await firebaseService.getAccountByUserId(userId);
+    try {
+      const q = query(collection(db, 'accounts'), where('userId', '==', userId));
+      const snapshot = await getDocs(q);
+      return snapshot.empty ? undefined : snapshot.docs[0].data() as Account;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'accounts');
+      return undefined;
+    }
+  }
+
+  async getAccountByAccountNumber(accountNumber: string): Promise<Account | undefined> {
+    try {
+      const q = query(collection(db, 'accounts'), where('accountNumber', '==', accountNumber));
+      const snapshot = await getDocs(q);
+      return snapshot.empty ? undefined : snapshot.docs[0].data() as Account;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'accounts');
+      return undefined;
+    }
   }
 
   async getAccountById(id: string): Promise<Account | undefined> {
-    return await firebaseService.getAccountById(id);
+    try {
+      const accountDoc = await getDoc(doc(db, 'accounts', id));
+      return accountDoc.exists() ? accountDoc.data() as Account : undefined;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, `accounts/${id}`);
+      return undefined;
+    }
   }
 
   async deleteAccount(id: string): Promise<void> {
-    await firebaseService.deleteAccount(id);
+    try {
+      await deleteDoc(doc(db, 'accounts', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `accounts/${id}`);
+    }
   }
 
   // Transactions
   async getTransactions(): Promise<Transaction[]> {
-    return await firebaseService.getTransactions();
+    try {
+      const q = query(collection(db, 'transactions'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as Transaction);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'transactions');
+      return [];
+    }
   }
 
   async saveTransaction(transaction: Transaction): Promise<void> {
-    await firebaseService.saveTransaction(transaction);
+    try {
+      await setDoc(doc(db, 'transactions', transaction.id), transaction);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `transactions/${transaction.id}`);
+    }
   }
 
-  async getTransactionsByAccountId(accountId: string): Promise<Transaction[]> {
-    return await firebaseService.getTransactionsByAccountId(accountId);
+  async getTransactionsByAccountId(accountId: string, userId?: string): Promise<Transaction[]> {
+    try {
+      let q;
+      if (userId) {
+        q = query(
+          collection(db, 'transactions'), 
+          where('userId', '==', userId),
+          where('accountId', '==', accountId),
+          orderBy('createdAt', 'desc')
+        );
+      } else {
+        q = query(
+          collection(db, 'transactions'), 
+          where('accountId', '==', accountId),
+          orderBy('createdAt', 'desc')
+        );
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as Transaction);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'transactions');
+      return [];
+    }
   }
 
   async deleteTransactionsByAccountId(accountId: string): Promise<void> {
-    await firebaseService.deleteTransactionsByAccountId(accountId);
+    try {
+      const q = query(collection(db, 'transactions'), where('accountId', '==', accountId));
+      const snapshot = await getDocs(q);
+      const batch = snapshot.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(batch);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'transactions');
+    }
   }
 
   // Notifications
   async getNotifications(): Promise<Notification[]> {
-    return await firebaseService.getNotifications();
+    try {
+      const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as Notification);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'notifications');
+      return [];
+    }
   }
 
   async saveNotification(notification: Notification): Promise<void> {
-    await firebaseService.saveNotification(notification);
+    try {
+      await setDoc(doc(db, 'notifications', notification.id), notification);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `notifications/${notification.id}`);
+    }
   }
 
   async getNotificationsByUserId(userId: string): Promise<Notification[]> {
-    return await firebaseService.getNotificationsByUserId(userId);
+    try {
+      const q = query(
+        collection(db, 'notifications'), 
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as Notification);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'notifications');
+      return [];
+    }
   }
 
   async deleteNotificationsByUserId(userId: string): Promise<void> {
-    await firebaseService.deleteNotificationsByUserId(userId);
+    try {
+      const q = query(collection(db, 'notifications'), where('userId', '==', userId));
+      const snapshot = await getDocs(q);
+      const batch = snapshot.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(batch);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'notifications');
+    }
   }
 
   // Chat Messages
   async getChatMessages(userId?: string): Promise<ChatMessage[]> {
-    return await firebaseService.getChatMessages(userId);
+    try {
+      let q = query(collection(db, 'chat_messages'), orderBy('createdAt', 'asc'));
+      if (userId) {
+        q = query(collection(db, 'chat_messages'), where('userId', '==', userId), orderBy('createdAt', 'asc'));
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as ChatMessage);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'chat_messages');
+      return [];
+    }
   }
 
   async saveChatMessage(message: ChatMessage): Promise<void> {
-    await firebaseService.saveChatMessage(message);
+    try {
+      await setDoc(doc(db, 'chat_messages', message.id), message);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `chat_messages/${message.id}`);
+    }
   }
 
   onChatMessages(userId: string | undefined, callback: (messages: ChatMessage[]) => void) {
-    return firebaseService.onChatMessages(userId, callback);
+    let q = query(collection(db, 'chat_messages'), orderBy('createdAt', 'asc'));
+    if (userId) {
+      q = query(collection(db, 'chat_messages'), where('userId', '==', userId), orderBy('createdAt', 'asc'));
+    }
+    return onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map(doc => doc.data() as ChatMessage));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'chat_messages');
+    });
   }
 
   // Deposits
   async getDeposits(): Promise<Deposit[]> {
-    return await firebaseService.getDeposits();
+    try {
+      const q = query(collection(db, 'deposits'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as Deposit);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'deposits');
+      return [];
+    }
   }
 
   async saveDeposit(deposit: Deposit): Promise<void> {
-    await firebaseService.saveDeposit(deposit);
+    try {
+      await setDoc(doc(db, 'deposits', deposit.id), deposit);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `deposits/${deposit.id}`);
+    }
+  }
+
+  async getDepositsByUserId(userId: string): Promise<Deposit[]> {
+    try {
+      const q = query(
+        collection(db, 'deposits'), 
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as Deposit);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'deposits');
+      return [];
+    }
   }
 
   // Loans
   async getLoans(): Promise<Loan[]> {
-    return await firebaseService.getLoans();
+    try {
+      const q = query(collection(db, 'loans'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as Loan);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'loans');
+      return [];
+    }
   }
 
   async saveLoan(loan: Loan): Promise<void> {
-    await firebaseService.saveLoan(loan);
+    try {
+      await setDoc(doc(db, 'loans', loan.id), loan);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `loans/${loan.id}`);
+    }
   }
 
   async getLoansByUserId(userId: string): Promise<Loan[]> {
-    return await firebaseService.getLoansByUserId(userId);
-  }
-
-  async getDepositsByUserId(userId: string): Promise<Deposit[]> {
-    return await firebaseService.getDepositsByUserId(userId);
+    try {
+      const q = query(
+        collection(db, 'loans'), 
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as Loan);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'loans');
+      return [];
+    }
   }
 
   async deleteLoansByUserId(userId: string): Promise<void> {
-    await firebaseService.deleteLoansByUserId(userId);
+    try {
+      const q = query(collection(db, 'loans'), where('userId', '==', userId));
+      const snapshot = await getDocs(q);
+      const batch = snapshot.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(batch);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'loans');
+    }
   }
 
   // Beneficiaries
   async getBeneficiaries(): Promise<Beneficiary[]> {
-    return await firebaseService.getBeneficiaries();
+    try {
+      const snapshot = await getDocs(collection(db, 'beneficiaries'));
+      return snapshot.docs.map(doc => doc.data() as Beneficiary);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'beneficiaries');
+      return [];
+    }
   }
 
   async saveBeneficiary(beneficiary: Beneficiary): Promise<void> {
-    await firebaseService.saveBeneficiary(beneficiary);
+    try {
+      await setDoc(doc(db, 'beneficiaries', beneficiary.id), beneficiary);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `beneficiaries/${beneficiary.id}`);
+    }
   }
 
   async getBeneficiariesByUserId(userId: string): Promise<Beneficiary[]> {
-    return await firebaseService.getBeneficiariesByUserId(userId);
+    try {
+      const q = query(collection(db, 'beneficiaries'), where('userId', '==', userId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as Beneficiary);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'beneficiaries');
+      return [];
+    }
   }
 
   // Contact Messages
   async getContactMessages(): Promise<ContactMessage[]> {
-    return await firebaseService.getContactMessages();
+    try {
+      const q = query(collection(db, 'contact_messages'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as ContactMessage);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'contact_messages');
+      return [];
+    }
   }
 
   async saveContactMessage(message: ContactMessage): Promise<void> {
-    await firebaseService.saveContactMessage(message);
+    try {
+      await setDoc(doc(db, 'contact_messages', message.id), message);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `contact_messages/${message.id}`);
+    }
   }
 
   // Audit Logs
   async getAuditLogs(): Promise<AuditLog[]> {
-    return await firebaseService.getAuditLogs();
+    try {
+      const q = query(collection(db, 'audit_logs'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as AuditLog);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'audit_logs');
+      return [];
+    }
+  }
+
+  async saveAuditLog(log: AuditLog): Promise<void> {
+    try {
+      // Ensure no undefined values are passed to Firestore
+      const sanitizedLog = {
+        ...log,
+        adminId: log.adminId || 'unknown',
+        adminName: log.adminName || 'Unknown Admin'
+      };
+      await setDoc(doc(db, 'audit_logs', sanitizedLog.id), sanitizedLog);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `audit_logs/${log.id}`);
+    }
   }
 
   // Payment Methods
   async getPaymentMethods(): Promise<PaymentMethod[]> {
-    return await firebaseService.getPaymentMethods();
+    try {
+      const snapshot = await getDocs(collection(db, 'payment_methods'));
+      return snapshot.docs.map(doc => doc.data() as PaymentMethod);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'payment_methods');
+      return [];
+    }
   }
 
   async savePaymentMethod(method: PaymentMethod): Promise<void> {
-    await firebaseService.savePaymentMethod(method);
+    try {
+      await setDoc(doc(db, 'payment_methods', method.id.toString()), method);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `payment_methods/${method.id}`);
+    }
   }
 
-  async saveAuditLog(log: AuditLog): Promise<void> {
-    await firebaseService.saveAuditLog(log);
+  async deletePaymentMethod(id: string | number): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'payment_methods', id.toString()));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `payment_methods/${id}`);
+    }
   }
 
   // Settings
   async getSettings(): Promise<any> {
-    return await firebaseService.getSettings();
+    try {
+      const settingsDoc = await getDoc(doc(db, 'settings', 'global'));
+      return settingsDoc.exists() ? settingsDoc.data() : {};
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'settings/global');
+      return {};
+    }
   }
 
   async saveSettings(settings: any): Promise<void> {
-    await firebaseService.saveSettings(settings);
-  }
-
-  async deletePaymentMethod(id: number): Promise<void> {
-    await firebaseService.deletePaymentMethod(id.toString());
+    try {
+      await setDoc(doc(db, 'settings', 'global'), settings);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'settings/global');
+    }
   }
 
   async uploadFile(file: File, path: string): Promise<string> {
-    return await firebaseService.uploadFile(file, path);
+    // Mock file upload: return a data URL since we don't have Firebase Storage set up
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 }
 

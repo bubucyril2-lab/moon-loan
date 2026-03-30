@@ -13,7 +13,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { Account } from '../../types';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { storageService } from '../../services/storage';
 
@@ -53,11 +53,24 @@ const CustomerTransfers = () => {
   useEffect(() => {
     const fetchAccount = async () => {
       if (!user) return;
-      const data = await storageService.getAccountByUserId(user.id);
-      if (data) setAccount(data);
+      try {
+        const data = await storageService.getAccountByUserId(user.id);
+        if (data) setAccount(data);
+      } catch (error) {
+        console.error('Error fetching account:', error);
+      }
     };
-    fetchAccount();
-    fetchBeneficiaries();
+
+    const fetchAllData = async () => {
+      setIsLoading(true);
+      try {
+        await Promise.all([fetchAccount(), fetchBeneficiaries()]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAllData();
   }, [user]);
 
   const handleAddBeneficiary = async (e: React.FormEvent) => {
@@ -84,7 +97,6 @@ const CustomerTransfers = () => {
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !account) return;
-    setIsLoading(true);
 
     try {
       const transferAmount = parseFloat(amount);
@@ -92,12 +104,19 @@ const CustomerTransfers = () => {
       const totalDebit = transferAmount + fee;
 
       if (account.balance < totalDebit) {
-        throw new Error('Insufficient balance');
+        throw new Error('INSUFFICIENT BALANCE');
       }
 
-      if (user.pin !== pin) {
-        throw new Error('Invalid transaction PIN');
+      const userPin = user?.transactionPin;
+      if (!userPin) {
+        throw new Error('TRANSFER PIN NOT SET. PLEASE CONTACT ADMIN.');
       }
+
+      if (pin !== userPin) {
+        throw new Error('INVALID TRANSFER PIN');
+      }
+
+      setIsLoading(true);
 
       // Update sender account
       await storageService.saveAccount({
@@ -120,8 +139,7 @@ const CustomerTransfers = () => {
 
       // If internal, update recipient account
       if (transferType === 'internal') {
-        const allAccounts = await storageService.getAccounts();
-        const recipientAcc = allAccounts.find(a => a.account_number === recipientAccount);
+        const recipientAcc = await storageService.getAccountByAccountNumber(recipientAccount);
         if (recipientAcc) {
           await storageService.saveAccount({
             ...recipientAcc,
@@ -151,13 +169,16 @@ const CustomerTransfers = () => {
             createdAt: new Date().toISOString(),
             created_at: new Date().toISOString()
           });
+        } else {
+          console.warn('Recipient account not found or access denied. Proceeding with debit only.');
         }
       }
 
       setStep(3);
       toast.success('TRANSFER SUCCESSFUL');
     } catch (error: any) {
-      toast.error(error.message);
+      const message = error.message || 'Transfer failed';
+      toast.error(message.toUpperCase());
     } finally {
       setIsLoading(false);
     }
@@ -179,8 +200,8 @@ const CustomerTransfers = () => {
             <CheckCircle2 className="h-12 w-12 text-emerald-600" />
           </div>
           <h2 className="text-4xl font-black text-emerald-600 mb-4 tracking-tighter uppercase">TRANSFER SUCCESSFUL</h2>
-          <p className="text-slate-600 mb-8">
-            Your transfer of <span className="font-bold text-slate-900">${parseFloat(amount).toLocaleString()}</span> to account <span className="font-mono font-bold text-slate-900">{recipientAccount}</span> has been processed successfully.
+          <p className="text-slate-600 mb-8 uppercase text-xs font-bold leading-relaxed">
+            YOUR TRANSFER OF <span className="font-bold text-slate-900">${parseFloat(amount).toLocaleString()}</span> TO ACCOUNT <span className="font-mono font-bold text-slate-900">{recipientAccount}</span> HAS BEEN PROCESSED SUCCESSFULLY.
           </p>
           <div className="bg-slate-50 rounded-2xl p-6 mb-8 text-left space-y-3">
             <div className="flex justify-between text-sm">
@@ -245,6 +266,16 @@ const CustomerTransfers = () => {
           International
         </button>
       </div>
+
+      {!user?.transactionPin && (
+        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-6 flex gap-4 items-center">
+          <AlertCircle className="h-6 w-6 text-amber-600 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-bold text-amber-900 uppercase">TRANSFER PIN NOT SET</p>
+            <p className="text-xs text-amber-700 mt-1 uppercase">YOUR TRANSFER PIN IS NOT SET. PLEASE CONTACT THE BANK ADMINISTRATOR TO SET YOUR PIN BEFORE YOU CAN MAKE ANY TRANSFERS.</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
@@ -389,8 +420,8 @@ const CustomerTransfers = () => {
                     <div className="flex gap-3">
                       <AlertCircle className="h-6 w-6 text-amber-600 flex-shrink-0" />
                       <div>
-                        <p className="text-sm font-bold text-amber-900">Review {transferType.charAt(0).toUpperCase() + transferType.slice(1)} Transaction</p>
-                        <p className="text-xs text-amber-700 mt-1">Please verify the recipient details before confirming. Transfers are irreversible.</p>
+                        <p className="text-sm font-bold text-amber-900 uppercase">REVIEW {transferType.toUpperCase()} TRANSACTION</p>
+                        <p className="text-xs text-amber-700 mt-1 uppercase">PLEASE VERIFY THE RECIPIENT DETAILS BEFORE CONFIRMING. TRANSFERS ARE IRREVERSIBLE.</p>
                       </div>
                     </div>
                   </div>
@@ -442,16 +473,18 @@ const CustomerTransfers = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <label className="block text-sm font-bold text-slate-700">Enter Transaction PIN</label>
+                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                    <label className="block text-sm font-bold text-slate-700 uppercase tracking-tight">
+                      FINAL TRANSFER PIN NEEDED TO HAVE A SUCCESSFUL TRANSFER
+                    </label>
                     <input 
                       type="password" 
                       required
                       maxLength={4}
                       value={pin}
                       onChange={(e) => setPin(e.target.value)}
-                      placeholder="••••"
-                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-center text-2xl tracking-[1em]"
+                      placeholder="****"
+                      className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono text-center text-2xl tracking-widest"
                     />
                   </div>
 
@@ -470,7 +503,7 @@ const CustomerTransfers = () => {
                     >
                       {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
                         <>
-                          <ShieldCheck className="h-5 w-5" />
+                          <Send className="h-5 w-5" />
                           Confirm Transfer
                         </>
                       )}

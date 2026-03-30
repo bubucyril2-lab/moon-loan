@@ -1,8 +1,7 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { firebaseService } from './services/firebaseService';
 
 // Public Pages
 import Home from './pages/public/Home';
@@ -24,6 +23,7 @@ import CustomerHistory from './pages/customer/History';
 import CustomerChat from './pages/customer/Chat';
 import CustomerLoans from './pages/customer/Loans';
 import CustomerSettings from './pages/customer/Settings';
+import CustomerNotifications from './pages/customer/Notifications';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/Dashboard';
@@ -41,16 +41,34 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; role?: 'admin' | 'cu
 
   if (isLoading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
   if (!user) return <Navigate to="/login" />;
-  if (role && user.role !== role) return <Navigate to="/" />;
+  
+  if (user.status === 'disabled') {
+    return <Navigate to="/login" />;
+  }
+
+  if (role && user.role !== role) {
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} />;
+  }
+
+  return <>{children}</>;
+};
+
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  
+  if (user) {
+    if (user.status === 'disabled') {
+      return <>{children}</>;
+    }
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} />;
+  }
 
   return <>{children}</>;
 };
 
 export default function App() {
-  useEffect(() => {
-    firebaseService.testConnection();
-  }, []);
-
   return (
     <ErrorBoundary>
       <AuthProvider>
@@ -62,9 +80,9 @@ export default function App() {
             <Route path="/about" element={<About />} />
             <Route path="/services" element={<Services />} />
             <Route path="/contact" element={<Contact />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+            <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+            <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
 
             {/* Customer Routes */}
             <Route path="/dashboard" element={
@@ -78,6 +96,7 @@ export default function App() {
               <Route path="chat" element={<CustomerChat />} />
               <Route path="loans" element={<CustomerLoans />} />
               <Route path="settings" element={<CustomerSettings />} />
+              <Route path="notifications" element={<CustomerNotifications />} />
             </Route>
 
             {/* Admin Routes */}

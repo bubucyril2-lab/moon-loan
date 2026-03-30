@@ -24,10 +24,19 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const CustomerLayout = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isLoading && user && user.role !== 'customer') {
+      navigate('/admin');
+    }
+  }, [user, isLoading, navigate]);
+
+  if (isLoading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  if (!user || user.role !== 'customer') return null;
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Overview', path: '/dashboard' },
@@ -59,7 +68,7 @@ const CustomerLayout = () => {
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
-          <Link to="/" className="p-6 flex items-center gap-3">
+          <Link to="/dashboard" className="p-6 flex items-center gap-3">
             <Landmark className="h-8 w-8 text-emerald-500" />
             <span className="text-xl font-bold text-white tracking-tight">MOONSTONE</span>
           </Link>
@@ -118,6 +127,7 @@ const CustomerLayout = () => {
             </button>
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-sm font-bold text-slate-900">{user?.fullName}</span>
+              <span className="text-[10px] text-slate-500">{user?.email}</span>
               <span className="text-xs text-slate-500 capitalize">{user?.role} Account</span>
             </div>
             <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center border border-emerald-200 overflow-hidden">

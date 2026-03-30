@@ -12,7 +12,9 @@ import {
   ArrowRight,
   Send,
   Banknote,
-  User as UserIcon 
+  Lock,
+  User as UserIcon,
+  ShieldCheck 
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Account, Transaction } from '../../types';
@@ -38,13 +40,19 @@ const CustomerDashboard = () => {
     if (!user) return;
 
     const loadData = async () => {
-      const acc = await storageService.getAccountByUserId(user.id);
-      if (acc) {
-        setAccount(acc);
-        const txs = await storageService.getTransactionsByAccountId(acc.id);
-        setTransactions(txs.sort((a, b) => new Date(b.createdAt || b.created_at || '').getTime() - new Date(a.createdAt || a.created_at || '').getTime()));
+      try {
+        const acc = await storageService.getAccountByUserId(user.id);
+        if (acc) {
+          setAccount(acc);
+          const txs = await storageService.getTransactionsByAccountId(acc.id, user.id);
+          setTransactions(txs.sort((a, b) => new Date(b.createdAt || b.created_at || '').getTime() - new Date(a.createdAt || a.created_at || '').getTime()));
+        }
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        toast.error('Failed to load account data');
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     loadData();
@@ -143,7 +151,7 @@ const CustomerDashboard = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Link to="/dashboard/settings" className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all">
+          <Link to="/dashboard/settings?tab=Profile" className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all">
             Edit Profile
           </Link>
         </div>
@@ -227,46 +235,48 @@ const CustomerDashboard = () => {
             className="absolute inset-0" 
             onClick={() => setShowModal(null)}
           />
-          <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative z-10">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative z-10 overflow-hidden">
             <button 
               onClick={() => setShowModal(null)}
-              className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all"
+              className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all z-20"
             >
               <X className="h-5 w-5" />
             </button>
-            <h3 className="text-xl font-bold text-slate-900 mb-2 capitalize">{showModal} Funds</h3>
-            <p className="text-sm text-slate-500 mb-8">Enter the amount you wish to {showModal}.</p>
-            
-            <form onSubmit={handleAction} className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Amount ($)</label>
-                <input 
-                  type="number" 
-                  required
-                  min="1"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold text-lg"
-                  autoFocus
-                />
-              </div>
-              <button 
-                type="submit"
-                disabled={isSubmitting}
-                className={`w-full py-4 rounded-2xl font-bold text-white transition-all flex items-center justify-center gap-2 ${
-                  showModal === 'deposit' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-900 hover:bg-slate-800'
-                }`}
-              >
-                {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : (
-                  <>
-                    Confirm {showModal}
-                    <ArrowRight className="h-5 w-5" />
-                  </>
-                )}
-              </button>
-            </form>
+            <div className="p-8 max-h-[80vh] overflow-y-auto">
+              <h3 className="text-xl font-bold text-slate-900 mb-2 capitalize">{showModal} Funds</h3>
+              <p className="text-sm text-slate-500 mb-8">Enter the amount you wish to {showModal}.</p>
+              
+              <form onSubmit={handleAction} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Amount ($)</label>
+                  <input 
+                    type="number" 
+                    required
+                    min="1"
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold text-lg"
+                    autoFocus
+                  />
+                </div>
+                <button 
+                  type="submit"
+                  disabled={isSubmitting}
+                  className={`w-full py-4 rounded-2xl font-bold text-white transition-all flex items-center justify-center gap-2 ${
+                    showModal === 'deposit' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-900 hover:bg-slate-800'
+                  }`}
+                >
+                  {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+                    <>
+                      Confirm {showModal}
+                      <ArrowRight className="h-5 w-5" />
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
@@ -315,9 +325,12 @@ const CustomerDashboard = () => {
               <p className="text-center text-slate-500 text-sm py-8">No recent transactions</p>
             )}
           </div>
-          <button className="w-full mt-8 py-3 text-sm font-bold text-slate-600 hover:text-emerald-600 transition-colors border-t border-slate-100">
+          <Link 
+            to="/dashboard/history"
+            className="block w-full mt-8 py-3 text-sm font-bold text-center text-slate-600 hover:text-emerald-600 transition-colors border-t border-slate-100"
+          >
             View All Transactions
-          </button>
+          </Link>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 export interface User {
   id: string;
   email: string;
+  username?: string;
   fullName: string;
   full_name?: string;
   role: 'admin' | 'customer';
@@ -8,9 +9,11 @@ export interface User {
   profilePicture?: string;
   country?: string;
   city?: string;
+  address?: string;
+  phoneNumber?: string;
   age?: number;
   password?: string; // Added for local auth
-  pin?: string;
+  transactionPin?: string;
   twoFactorEnabled?: boolean;
   createdAt?: string;
   created_at?: string;
@@ -22,7 +25,6 @@ export interface Account {
   accountNumber: string;
   account_number?: string;
   balance: number;
-  pin?: string;
   status?: string;
   createdAt?: string;
   created_at?: string;

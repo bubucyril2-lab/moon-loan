@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
-import { auth } from '../firebase';
 import { User } from '../types';
-import { firebaseService } from '../services/firebaseService';
+import { auth, db, onAuthStateChanged, doc, getDoc, signOut } from '../firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -23,15 +21,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const userData = await firebaseService.getUserById(firebaseUser.uid);
-        if (userData) {
-          setUser(userData);
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as User;
+            setUser({ ...userData, id: firebaseUser.uid });
+          } else {
+            // Handle case where user exists in Auth but not in Firestore
+            // This might happen if registration was interrupted
+            setUser(null);
+          }
           const idToken = await firebaseUser.getIdToken();
           setToken(idToken);
-        } else {
-          // User exists in Auth but not in Firestore (shouldn't happen often)
+        } catch (error) {
+          console.error('Error fetching user data:', error);
           setUser(null);
-          setToken(null);
         }
       } else {
         setUser(null);
@@ -45,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = (userData: User) => {
     setUser(userData);
-    // Token will be set by onAuthStateChanged
+    // Token is handled by onAuthStateChanged
   };
 
   const logout = async () => {
@@ -56,9 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUser = async (data: Partial<User>) => {
     if (user) {
-      const updatedUser = { ...user, ...data };
-      await firebaseService.saveUser(updatedUser);
-      setUser(updatedUser);
+      setUser({ ...user, ...data });
     }
   };
 

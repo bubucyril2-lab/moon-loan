@@ -1,111 +1,61 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
     // ===============================================================
     // Assumed Data Model
     // ===============================================================
     //
     // Collection: users
-    // Document ID: userId (matches Auth UID)
+    // Document ID: userId (Auth UID)
     // Fields:
-    //   - fullName: string (required, 1-100 chars)
+    //   - id: string (required)
     //   - email: string (required, email format)
-    //   - role: string (required, 'admin' or 'customer')
-    //   - status: string (required, 'pending', 'active', 'disabled')
-    //   - pin: string (optional, 4 chars)
-    //   - profilePicture: string (optional, URL)
+    //   - username: string (optional)
+    //   - fullName: string (required)
+    //   - role: string (required, 'admin' | 'customer')
+    //   - status: string (required, 'pending' | 'active' | 'disabled')
+    //   - profilePicture: string (optional)
+    //   - country: string (optional)
+    //   - city: string (optional)
+    //   - address: string (optional)
+    //   - phoneNumber: string (optional)
+    //   - age: number (optional)
+    //   - transactionPin: string (optional)
+    //   - twoFactorEnabled: bool (optional)
     //   - createdAt: timestamp (optional)
     //
     // Collection: accounts
     // Document ID: accountId
     // Fields:
+    //   - id: string (required)
     //   - userId: string (required, owner UID)
-    //   - accountNumber: string (required, 10-20 chars)
-    //   - balance: number (required, >= 0)
-    //   - status: string (required)
+    //   - accountNumber: string (required)
+    //   - balance: number (required)
+    //   - status: string (optional)
+    //   - createdAt: timestamp (optional)
     //
     // Collection: transactions
     // Document ID: transactionId
     // Fields:
+    //   - id: string (required)
     //   - accountId: string (required)
-    //   - userId: string (required, performer UID)
-    //   - amount: number (required, > 0)
-    //   - type: string (required, 'credit' or 'debit')
-    //   - category: string (required)
-    //   - description: string (required, 1-200 chars)
+    //   - userId: string (required)
+    //   - type: string (required, 'credit' | 'debit')
+    //   - amount: number (required, positive)
+    //   - description: string (required)
+    //   - category: string (optional)
     //   - status: string (required)
+    //   - referenceId: string (optional)
+    //   - createdAt: timestamp (optional)
     //
-    // Collection: notifications
-    // Document ID: notificationId
-    // Fields:
-    //   - userId: string (required, recipient UID)
-    //   - title: string (required, 1-100 chars)
-    //   - message: string (required, 1-500 chars)
-    //   - type: string (required)
-    //   - isRead: bool (required)
-    //
-    // Collection: chat_messages
-    // Document ID: messageId
-    // Fields:
-    //   - userId: string (required, customer UID)
-    //   - senderId: string (required)
-    //   - text: string (required, 1-1000 chars)
-    //   - isAdmin: bool (required)
-    //
-    // Collection: loans
-    // Document ID: loanId
-    // Fields:
-    //   - userId: string (required, applicant UID)
-    //   - amount: number (required, > 0)
-    //   - status: string (required, 'pending', 'approved', 'rejected', 'repaying', 'completed')
-    //
-    // Collection: deposits
-    // Document ID: depositId
-    // Fields:
-    //   - userId: string (required, user UID)
-    //   - amount: number (required, > 0)
-    //   - status: string (required, 'pending', 'approved', 'rejected')
-    //
-    // Collection: beneficiaries
-    // Document ID: beneficiaryId
-    // Fields:
-    //   - userId: string (required, owner UID)
-    //   - name: string (required, 1-100 chars)
-    //   - accountNumber: string (required)
-    //
-    // Collection: audit_logs
-    // Document ID: logId
-    // Fields:
-    //   - adminId: string (required)
-    //   - adminName: string (required)
-    //   - action: string (required)
-    //   - details: string (required)
-    //
-    // Collection: payment_methods
-    // Document ID: methodId
-    // Fields:
-    //   - type: string (required)
-    //   - name: string (required)
-    //   - details: string (required)
-    //   - isActive: bool (required)
-    //
-    // Collection: contact_messages
-    // Document ID: messageId
-    // Fields:
-    //   - name: string (required)
-    //   - email: string (required)
-    //   - message: string (required)
-    //
-    // Collection: settings
-    // Document ID: 'system'
+    // [Other collections: notifications, chats, loans, deposits, beneficiaries, contact_messages]
     //
     // ===============================================================
 
     // ===============================================================
     // Helper Functions
     // ===============================================================
-
+    
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -116,30 +66,26 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
           request.auth.token.email == "bubucyril2@gmail.com" ||
           request.auth.token.email == "admin@gmail.com" ||
-          request.auth.token.email == "jen@gmail.com" ||
-          request.auth.uid == "wrBDIOCVQmU4S2BAJLzYMOvrit83" ||
-          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
-        );
+          request.auth.token.email == "admin@moonstone.com");
     }
 
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function isValidUrl(url) {
-      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
     }
 
     function hasOnlyAllowedFields(fields) {
       return request.resource.data.keys().hasOnly(fields);
     }
 
-    function hasRequiredFields(fields) {
-      return request.resource.data.keys().hasAll(fields);
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isPositive(field) {
+      return request.resource.data[field] is number && request.resource.data[field] >= 0;
     }
 
     // ===============================================================
@@ -147,191 +93,140 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return (data.keys().hasAny(['fullName', 'full_name'])) &&
-             data.keys().hasAll(['email', 'role', 'status']) &&
-             isValidEmail(data.email) &&
-             data.role in ['admin', 'customer'] &&
-             data.status in ['pending', 'active', 'disabled'];
+      return hasRequiredFields(['id', 'email', 'fullName', 'role', 'status']) &&
+        data.id is string &&
+        isValidEmail(data.email) &&
+        data.fullName is string && data.fullName.size() > 0 && data.fullName.size() < 100 &&
+        data.role in ['admin', 'customer'] &&
+        data.status in ['pending', 'active', 'disabled'];
     }
 
     function isValidAccount(data) {
-      return (data.keys().hasAny(['userId', 'user_id'])) &&
-             (data.keys().hasAny(['accountNumber', 'account_number'])) &&
-             data.keys().hasAll(['balance']) &&
-             data.balance is number && data.balance >= 0;
+      return hasRequiredFields(['id', 'userId', 'accountNumber', 'balance']) &&
+        data.id is string &&
+        data.userId is string &&
+        data.accountNumber is string &&
+        data.balance is number;
     }
 
     function isValidTransaction(data) {
-      return hasRequiredFields(['accountId', 'userId', 'amount', 'type', 'description', 'status']) &&
-             data.accountId is string &&
-             data.userId is string &&
-             data.amount is number && data.amount > 0 &&
-             data.type in ['credit', 'debit'] &&
-             data.description is string &&
-             (!('category' in data) || data.category is string);
-    }
-
-    function isValidNotification(data) {
-      return hasRequiredFields(['userId', 'title', 'message', 'type']) &&
-             data.userId is string &&
-             data.title is string &&
-             data.message is string &&
-             (!('isRead' in data) || data.isRead is bool) &&
-             (!('read' in data) || data.read is bool);
-    }
-
-    function isValidChatMessage(data) {
-      return hasRequiredFields(['userId', 'senderId', 'text', 'isAdmin']) &&
-             data.userId is string &&
-             data.senderId is string &&
-             data.text is string && data.text.size() > 0 && data.text.size() <= 1000 &&
-             data.isAdmin is bool;
-    }
-
-    function isValidLoan(data) {
-      return hasRequiredFields(['userId', 'amount', 'status']) &&
-             data.userId is string &&
-             data.amount is number && data.amount > 0 &&
-             data.status in ['pending', 'approved', 'rejected', 'repaying', 'completed'];
-    }
-
-    function isValidDeposit(data) {
-      return hasRequiredFields(['userId', 'amount', 'status']) &&
-             data.userId is string &&
-             data.amount is number && data.amount > 0 &&
-             data.status in ['pending', 'approved', 'rejected'];
-    }
-
-    function isValidBeneficiary(data) {
-      return hasRequiredFields(['userId', 'name', 'accountNumber']) &&
-             data.userId is string &&
-             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
-             data.accountNumber is string;
-    }
-
-    function isValidAuditLog(data) {
-      return hasRequiredFields(['adminId', 'adminName', 'action', 'details']) &&
-             data.adminId is string &&
-             data.adminName is string &&
-             data.action is string &&
-             data.details is string;
-    }
-
-    function isValidPaymentMethod(data) {
-      return hasRequiredFields(['type', 'name', 'details', 'isActive']) &&
-             data.type in ['bank', 'crypto'] &&
-             data.name is string &&
-             data.details is string &&
-             data.isActive is bool;
-    }
-
-    function isValidContactMessage(data) {
-      return hasRequiredFields(['name', 'email', 'message']) &&
-             data.name is string && data.name.size() > 0 &&
-             isValidEmail(data.email) &&
-             data.message is string && data.message.size() > 0;
+      return hasRequiredFields(['id', 'accountId', 'userId', 'type', 'amount', 'status']) &&
+        data.id is string &&
+        data.accountId is string &&
+        data.userId is string &&
+        data.type in ['credit', 'debit'] &&
+        data.amount is number && data.amount > 0 &&
+        data.status is string;
     }
 
     // ===============================================================
     // Rules
     // ===============================================================
 
-    // Default deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin()) &&
-                    (isAdmin() || request.resource.data.role == resource.data.role); // Prevent self-role escalation
-      allow delete: if isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
+        ((isOwner(userId) && request.resource.data.role == 'customer') || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+        ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
     }
 
     match /accounts/{accountId} {
-      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('user_id', '') == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && 
-                    (isAdmin() || (
-                      (request.resource.data.get('userId', '') == request.auth.uid || request.resource.data.get('user_id', '') == request.auth.uid) && 
-                      request.resource.data.balance == 0 && 
-                      request.resource.data.status == 'active'
-                    )) && 
-                    isValidAccount(request.resource.data);
-      allow update: if (isAdmin() || 
-                       (isAuthenticated() && 
-                        (!('pin' in resource.data) || request.resource.data.pin == resource.data.pin) &&
-                        (request.resource.data.get('userId', '') == resource.data.get('userId', '') || request.resource.data.get('user_id', '') == resource.data.get('user_id', '')) &&
-                        (request.resource.data.get('accountNumber', '') == resource.data.get('accountNumber', '') || request.resource.data.get('account_number', '') == resource.data.get('account_number', '')))) && 
-                    isValidAccount(request.resource.data);
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAdmin() && isValidAccount(request.resource.data);
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        (isOwner(resource.data.userId) && 
+         isValidAccount(request.resource.data) && 
+         request.resource.data.userId == resource.data.userId &&
+         request.resource.data.accountNumber == resource.data.accountNumber)
+      );
       allow delete: if isAdmin();
     }
 
+    // ===============================================================
+    // Collection: transactions
+    // Document ID: auto-generated
+    // Fields:
+    //   - id: string (required)
+    //   - accountId: string (required)
+    //   - userId: string (required)
+    //   - amount: number (required)
+    //   - type: string (required, enum: ['credit', 'debit'])
+    //   - description: string (required)
+    //   - status: string (required, enum: ['pending', 'completed', 'failed'])
+    //   - reference_id: string (optional)
+    //   - created_at: string (required, ISO 8601)
+    // ===============================================================
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated() && (
-        isAdmin() ||
-        resource.data.userId == request.auth.uid
-      );
-      allow create: if isAuthenticated() && isValidTransaction(request.resource.data) && (request.resource.data.userId == request.auth.uid || isAdmin());
-      allow update: if isAdmin() && isValidTransaction(request.resource.data);
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && isValidTransaction(request.resource.data) && 
+        (request.auth.uid == request.resource.data.userId || isAdmin());
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     match /notifications/{notificationId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidNotification(request.resource.data);
-      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidNotification(request.resource.data);
-      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAdmin();
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
     }
 
-    match /chat_messages/{messageId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidChatMessage(request.resource.data) && (request.resource.data.userId == request.auth.uid || isAdmin());
+    match /chat_messages/{chatId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.userId || isAdmin());
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     match /loans/{loanId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidLoan(request.resource.data) && (request.resource.data.userId == request.auth.uid || isAdmin());
-      allow update: if isAdmin() && isValidLoan(request.resource.data);
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     match /deposits/{depositId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidDeposit(request.resource.data) && (request.resource.data.userId == request.auth.uid || isAdmin());
-      allow update: if isAdmin() && isValidDeposit(request.resource.data);
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     match /beneficiaries/{beneficiaryId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidBeneficiary(request.resource.data) && (request.resource.data.userId == request.auth.uid || isAdmin());
-      allow update: if isAuthenticated() && (isOwner(resource.data.userId) || isAdmin()) && isValidBeneficiary(request.resource.data);
-      allow delete: if isAuthenticated() && (isOwner(resource.data.userId) || isAdmin());
-    }
-
-    match /audit_logs/{logId} {
-      allow read: if isAdmin();
-      allow create: if isAuthenticated() && isValidAuditLog(request.resource.data) && (request.resource.data.adminId == request.auth.uid || request.resource.data.adminId == 'system');
-      allow delete: if isAdmin();
-    }
-
-    match /payment_methods/{methodId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() && isValidPaymentMethod(request.resource.data);
-      allow delete: if isAdmin();
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
     }
 
     match /contact_messages/{messageId} {
       allow read: if isAdmin();
-      allow create: if isValidContactMessage(request.resource.data);
+      allow create: if true; // Public contact form
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /payment_methods/{methodId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     match /settings/{settingId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
   }

@@ -5,215 +5,199 @@
       "description": "User profile information",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique user ID (matches Firebase Auth UID)" },
-        "fullName": { "type": "string", "description": "User's full name" },
-        "email": { "type": "string", "format": "email", "description": "User's email address" },
-        "role": { "type": "string", "enum": ["admin", "customer"], "description": "User's role" },
-        "status": { "type": "string", "enum": ["active", "pending", "disabled"], "description": "Account status" },
-        "pin": { "type": "string", "description": "4-digit transaction PIN" },
-        "profilePicture": { "type": "string", "format": "uri", "description": "URL to profile picture" },
-        "twoFactorEnabled": { "type": "boolean", "description": "Whether 2FA is enabled" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation timestamp" }
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "username": { "type": "string" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "customer"] },
+        "status": { "type": "string", "enum": ["pending", "active", "disabled"] },
+        "profilePicture": { "type": "string" },
+        "country": { "type": "string" },
+        "city": { "type": "string" },
+        "address": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "age": { "type": "integer" },
+        "transactionPin": { "type": "string" },
+        "twoFactorEnabled": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "fullName", "email", "role", "status"]
+      "required": ["id", "email", "fullName", "role", "status"]
     },
     "Account": {
       "title": "Account",
-      "description": "Bank account information",
+      "description": "Bank account details",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique account ID" },
-        "userId": { "type": "string", "description": "ID of the user who owns this account" },
-        "accountNumber": { "type": "string", "description": "Bank account number" },
-        "balance": { "type": "number", "description": "Current account balance" },
-        "status": { "type": "string", "enum": ["active", "disabled"], "description": "Account status" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation timestamp" }
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "balance": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "userId", "accountNumber", "balance", "status"]
+      "required": ["id", "userId", "accountNumber", "balance"]
     },
     "Transaction": {
       "title": "Transaction",
       "description": "Financial transaction record",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique transaction ID" },
-        "accountId": { "type": "string", "description": "ID of the account involved" },
-        "userId": { "type": "string", "description": "ID of the user who performed the transaction" },
-        "amount": { "type": "number", "description": "Transaction amount" },
-        "type": { "type": "string", "enum": ["credit", "debit"], "description": "Transaction type" },
-        "category": { "type": "string", "description": "Transaction category (e.g., Transfer, Deposit, Loan)" },
-        "description": { "type": "string", "description": "Transaction description" },
-        "status": { "type": "string", "enum": ["completed", "pending", "failed"], "description": "Transaction status" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Transaction timestamp" }
+        "id": { "type": "string" },
+        "accountId": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["credit", "debit"] },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string" },
+        "referenceId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "accountId", "userId", "amount", "type", "category", "status"]
+      "required": ["id", "accountId", "userId", "type", "amount", "status"]
     },
     "Notification": {
       "title": "Notification",
-      "description": "User notification",
+      "description": "System notification for a user",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique notification ID" },
-        "userId": { "type": "string", "description": "ID of the user to notify" },
-        "title": { "type": "string", "description": "Notification title" },
-        "message": { "type": "string", "description": "Notification message" },
-        "type": { "type": "string", "enum": ["info", "success", "alert"], "description": "Notification type" },
-        "isRead": { "type": "boolean", "description": "Whether the notification has been read" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Notification timestamp" }
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "userId", "title", "message", "type", "isRead"]
+      "required": ["id", "userId", "title", "message", "type"]
     },
     "ChatMessage": {
       "title": "ChatMessage",
       "description": "Support chat message",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique message ID" },
-        "userId": { "type": "string", "description": "ID of the customer" },
-        "senderId": { "type": "string", "description": "ID of the sender (customer or admin)" },
-        "text": { "type": "string", "description": "Message content" },
-        "isAdmin": { "type": "boolean", "description": "Whether the sender is an admin" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Message timestamp" }
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "isAdmin": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "userId", "senderId", "text", "isAdmin"]
     },
     "Loan": {
       "title": "Loan",
-      "description": "Loan application and status",
+      "description": "Loan application record",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique loan ID" },
-        "userId": { "type": "string", "description": "ID of the applicant" },
-        "amount": { "type": "number", "description": "Loan amount" },
-        "interestRate": { "type": "number", "description": "Interest rate" },
-        "repaymentSchedule": { "type": "string", "description": "Repayment schedule (e.g., Monthly)" },
-        "paidAmount": { "type": "number", "description": "Amount already repaid" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "repaying", "completed"], "description": "Loan status" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Application timestamp" }
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "purpose": { "type": "string" },
+        "interestRate": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "repaying", "completed"] },
+        "repaymentSchedule": { "type": "string" },
+        "paidAmount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "userId", "amount", "interestRate", "status"]
+      "required": ["id", "userId", "amount", "status"]
     },
     "Deposit": {
       "title": "Deposit",
       "description": "Deposit request",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique deposit ID" },
-        "userId": { "type": "string", "description": "ID of the user" },
-        "amount": { "type": "number", "description": "Deposit amount" },
-        "method": { "type": "string", "description": "Deposit method" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "Deposit status" },
-        "proofImage": { "type": "string", "format": "uri", "description": "URL to proof of payment image" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Deposit timestamp" }
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "paymentMethodId": { "type": "string" },
+        "proofImage": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "userId", "amount", "method", "status"]
+      "required": ["id", "userId", "amount", "status"]
     },
     "Beneficiary": {
       "title": "Beneficiary",
-      "description": "Saved transfer beneficiary",
+      "description": "Saved transfer recipient",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique beneficiary ID" },
-        "userId": { "type": "string", "description": "ID of the user who saved this beneficiary" },
-        "name": { "type": "string", "description": "Beneficiary name" },
-        "accountNumber": { "type": "string", "description": "Beneficiary account number" },
-        "bankName": { "type": "string", "description": "Beneficiary bank name" },
-        "type": { "type": "string", "enum": ["internal", "local", "international"], "description": "Transfer type" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "bankName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "userId", "name", "accountNumber", "type"]
+      "required": ["id", "userId", "name", "accountNumber"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "Public contact form submission",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "email", "message"]
     },
     "AuditLog": {
       "title": "AuditLog",
-      "description": "Administrative action log",
+      "description": "Admin activity log",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique log ID" },
-        "adminId": { "type": "string", "description": "ID of the admin who performed the action" },
-        "adminName": { "type": "string", "description": "Name of the admin" },
-        "action": { "type": "string", "description": "Action performed" },
-        "details": { "type": "string", "description": "Action details" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Action timestamp" }
+        "id": { "type": "string" },
+        "adminId": { "type": "string" },
+        "adminName": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "adminId", "adminName", "action", "details"]
     },
     "PaymentMethod": {
       "title": "PaymentMethod",
-      "description": "Bank payment method for deposits",
+      "description": "Available payment methods for deposits/loans",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique ID" },
-        "type": { "type": "string", "enum": ["bank", "crypto"], "description": "Method type" },
-        "name": { "type": "string", "description": "Method name" },
-        "details": { "type": "string", "description": "Account details" },
-        "instructions": { "type": "string", "description": "Payment instructions" },
-        "isActive": { "type": "boolean", "description": "Whether the method is active" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["bank", "crypto"] },
+        "name": { "type": "string" },
+        "details": { "type": "string" },
+        "instructions": { "type": "string" },
+        "is_active": { "type": "integer" },
+        "created_at": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "type", "name", "details", "isActive"]
+      "required": ["id", "type", "name", "details", "instructions", "is_active"]
     },
-    "ContactMessage": {
-      "title": "ContactMessage",
-      "description": "Message from contact form",
+    "Settings": {
+      "title": "Settings",
+      "description": "Global application settings",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique message ID" },
-        "name": { "type": "string", "description": "Sender name" },
-        "email": { "type": "string", "format": "email", "description": "Sender email" },
-        "message": { "type": "string", "description": "Message content" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp" }
-      },
-      "required": ["id", "name", "email", "message"]
+        "bankName": { "type": "string" },
+        "bankEmail": { "type": "string" },
+        "bankPhone": { "type": "string" },
+        "bankAddress": { "type": "string" },
+        "maintenanceMode": { "type": "boolean" },
+        "allowRegistration": { "type": "boolean" }
+      }
     }
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": "User",
-      "description": "User profile collection"
-    },
-    "/accounts/{accountId}": {
-      "schema": "Account",
-      "description": "Bank accounts collection"
-    },
-    "/transactions/{transactionId}": {
-      "schema": "Transaction",
-      "description": "Financial transactions collection"
-    },
-    "/notifications/{notificationId}": {
-      "schema": "Notification",
-      "description": "User notifications collection"
-    },
-    "/chat_messages/{messageId}": {
-      "schema": "ChatMessage",
-      "description": "Support chat messages collection"
-    },
-    "/loans/{loanId}": {
-      "schema": "Loan",
-      "description": "Loan applications collection"
-    },
-    "/deposits/{depositId}": {
-      "schema": "Deposit",
-      "description": "Deposit requests collection"
-    },
-    "/beneficiaries/{beneficiaryId}": {
-      "schema": "Beneficiary",
-      "description": "Saved beneficiaries collection"
-    },
-    "/audit_logs/{logId}": {
-      "schema": "AuditLog",
-      "description": "Administrative audit logs collection"
-    },
-    "/payment_methods/{methodId}": {
-      "schema": "PaymentMethod",
-      "description": "Payment methods for deposits"
-    },
-    "/contact_messages/{messageId}": {
-      "schema": "ContactMessage",
-      "description": "Contact form messages"
-    },
-    "/settings/{settingId}": {
-      "schema": "object",
-      "description": "Global system settings"
-    }
+    "/users/{userId}": { "schema": "User", "description": "User profile document" },
+    "/accounts/{accountId}": { "schema": "Account", "description": "Bank account document" },
+    "/transactions/{transactionId}": { "schema": "Transaction", "description": "Transaction record document" },
+    "/notifications/{notificationId}": { "schema": "Notification", "description": "Notification document" },
+    "/chat_messages/{chatId}": { "schema": "ChatMessage", "description": "Chat message document" },
+    "/loans/{loanId}": { "schema": "Loan", "description": "Loan application document" },
+    "/deposits/{depositId}": { "schema": "Deposit", "description": "Deposit request document" },
+    "/beneficiaries/{beneficiaryId}": { "schema": "Beneficiary", "description": "Beneficiary document" },
+    "/contact_messages/{messageId}": { "schema": "ContactMessage", "description": "Contact message document" },
+    "/audit_logs/{logId}": { "schema": "AuditLog", "description": "Admin audit log document" },
+    "/payment_methods/{methodId}": { "schema": "PaymentMethod", "description": "Payment method document" },
+    "/settings/{settingId}": { "schema": "Settings", "description": "Global settings document" }
   }
 }

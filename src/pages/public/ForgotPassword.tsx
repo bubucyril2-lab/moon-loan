@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Landmark, Mail, Loader2, AlertCircle, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { storageService } from '../../services/storage';
+import { firebaseAuthService } from '../../services/firebaseAuthService';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -16,13 +16,7 @@ const ForgotPassword = () => {
     setError('');
 
     try {
-      // Mock password reset
-      const user = storageService.getUserByEmail(email);
-      if (!user) {
-        throw new Error('No account found with this email address');
-      }
-
-      // In a real app, we'd send an email. Here we just mock success.
+      await firebaseAuthService.forgotPassword(email);
       setIsSubmitted(true);
       toast.success('Password reset email sent!');
     } catch (err: any) {

@@ -2,18 +2,16 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Landmark, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../firebase';
-import { firebaseService } from '../../services/firebaseService';
+import { firebaseAuthService } from '../../services/firebaseAuthService';
 import { useAuth } from '../../context/AuthContext';
 
 const Login = () => {
+  const { user, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,38 +19,30 @@ const Login = () => {
     setError('');
 
     try {
-      // Firebase login
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userId = userCredential.user.uid;
+      const loggedInUser = await firebaseAuthService.login(email, password);
       
-      let user = await firebaseService.getUserById(userId);
-      
-      // Auto-create admin profile if it exists in Auth but missing in Firestore
-      if (!user && (email === 'admin@gmail.com' || email === 'bubucyril2@gmail.com')) {
-        const adminUser = {
-          id: userId,
-          email: email,
-          fullName: email === 'bubucyril2@gmail.com' ? 'Cyril Bubu' : 'System Administrator',
-          role: 'admin' as const,
-          status: 'active' as const,
-          createdAt: new Date().toISOString()
-        };
-        await firebaseService.saveUser(adminUser);
-        user = adminUser;
-      }
-
-      if (!user) {
-        throw new Error('User data not found. If you have already registered, please try registering again with the same credentials to complete your profile.');
-      }
-
-      if (user.status === 'disabled') {
-        throw new Error('Your account has been disabled. Please contact support.');
-      }
-
-      login(user);
       toast.success('Welcome back!');
       
-      if (user.role === 'admin') {
+      if (loggedInUser.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message);
+      toast.error(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const loggedInUser = await firebaseAuthService.loginWithGoogle();
+      toast.success('Welcome back!');
+      if (loggedInUser.role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
@@ -168,9 +158,28 @@ const Login = () => {
                 )}
               </button>
             </div>
-          </form>
 
-          
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-slate-500 uppercase tracking-wider text-xs font-semibold">Or continue with</span>
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={isLoading}
+                className="w-full flex justify-center items-center gap-3 py-3 px-4 border border-slate-200 rounded-xl shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="h-5 w-5" referrerPolicy="no-referrer" />
+                Sign in with Google
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

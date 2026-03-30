@@ -5,31 +5,23 @@ import { format } from 'date-fns';
 import { safeFormat } from '../utils/date';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
-
-interface Notification {
-  id: number;
-  title: string;
-  message: string;
-  type: string;
-  is_read: number;
-  created_at: string;
-}
+import { storageService } from '../services/storage';
+import { useNavigate } from 'react-router-dom';
+import { Notification } from '../types';
 
 const NotificationCenter = () => {
-  const { token } = useAuth();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchNotifications = async () => {
-    if (!token) return;
+    if (!user) return;
     setIsLoading(true);
     try {
-      const res = await fetch('/api/notifications', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setNotifications(data);
+      const data = await storageService.getNotificationsByUserId(user.id);
+      setNotifications(data.sort((a, b) => new Date(b.created_at || b.createdAt || '').getTime() - new Date(a.created_at || a.createdAt || '').getTime()));
     } catch (error) {
       console.error('Failed to fetch notifications');
     } finally {
@@ -41,21 +33,22 @@ const NotificationCenter = () => {
     if (isOpen) {
       fetchNotifications();
     }
-  }, [isOpen, token]);
+  }, [isOpen, user]);
 
-  const markAsRead = async (id: number) => {
+  const markAsRead = async (id: string) => {
     try {
-      await fetch(`/api/notifications/${id}/read`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: 1 } : n));
+      const notification = notifications.find(n => n.id === id);
+      if (notification) {
+        const updated = { ...notification, isRead: true, read: true };
+        await storageService.saveNotification(updated);
+        setNotifications(notifications.map(n => n.id === id ? updated : n));
+      }
     } catch (error) {
       toast.error('Failed to mark as read');
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -107,25 +100,25 @@ const NotificationCenter = () => {
                     {notifications.map((n) => (
                       <div 
                         key={n.id} 
-                        className={`p-4 hover:bg-slate-50 transition-colors cursor-pointer ${!n.is_read ? 'bg-emerald-50/30' : ''}`}
-                        onClick={() => !n.is_read && markAsRead(n.id)}
+                        className={`p-4 hover:bg-slate-50 transition-colors cursor-pointer ${!n.read ? 'bg-emerald-50/30' : ''}`}
+                        onClick={() => !n.read && markAsRead(n.id)}
                       >
                         <div className="flex gap-3">
                           <div className="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center flex-shrink-0 shadow-sm">
                             {getIcon(n.type)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-bold text-slate-900 ${!n.is_read ? 'pr-4' : ''}`}>
+                            <p className={`text-sm font-bold text-slate-900 ${!n.read ? 'pr-4' : ''}`}>
                               {n.title}
                             </p>
                             <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                               {n.message}
                             </p>
                             <p className="text-[10px] text-slate-400 mt-2">
-                              {safeFormat(n.created_at, 'MMM d, HH:mm')}
+                              {safeFormat(n.created_at || n.createdAt, 'MMM d, HH:mm')}
                             </p>
                           </div>
-                          {!n.is_read && (
+                          {!n.read && (
                             <div className="w-2 h-2 bg-emerald-500 rounded-full flex-shrink-0 mt-1.5" />
                           )}
                         </div>
@@ -145,7 +138,13 @@ const NotificationCenter = () => {
 
               {notifications.length > 0 && (
                 <div className="p-3 border-t border-slate-100 bg-slate-50/50">
-                  <button className="w-full py-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors">
+                  <button 
+                    onClick={() => {
+                      setIsOpen(false);
+                      navigate('/dashboard/notifications');
+                    }}
+                    className="w-full py-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors"
+                  >
                     View All Notifications
                   </button>
                 </div>

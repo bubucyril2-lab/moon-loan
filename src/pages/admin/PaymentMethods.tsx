@@ -7,6 +7,7 @@ import {
   Edit2, 
   CheckCircle2, 
   XCircle,
+  X,
   AlertCircle,
   Loader2,
   Banknote
@@ -66,6 +67,18 @@ const AdminPaymentMethods = () => {
       };
 
       await storageService.savePaymentMethod(methodToSave);
+
+      if (user) {
+        await storageService.saveAuditLog({
+          id: Math.random().toString(36).substr(2, 9),
+          adminId: user.id,
+          adminName: user.fullName || user.full_name || '',
+          action: editingMethod ? 'payment_method_update' : 'payment_method_create',
+          details: `${editingMethod ? 'Updated' : 'Created'} payment method: ${methodToSave.name} (${methodToSave.type})`,
+          createdAt: new Date().toISOString()
+        });
+      }
+
       toast.success(editingMethod ? 'Payment method updated' : 'Payment method added');
       setShowModal(false);
       setEditingMethod(null);
@@ -76,9 +89,22 @@ const AdminPaymentMethods = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     try {
+      const method = methods.find(m => m.id === id);
       await storageService.deletePaymentMethod(id);
+
+      if (user && method) {
+        await storageService.saveAuditLog({
+          id: Math.random().toString(36).substr(2, 9),
+          adminId: user.id,
+          adminName: user.fullName || user.full_name || '',
+          action: 'payment_method_delete',
+          details: `Deleted payment method: ${method.name} (${method.type})`,
+          createdAt: new Date().toISOString()
+        });
+      }
+
       toast.success('Payment method deleted');
       fetchMethods();
     } catch (error) {
@@ -178,103 +204,105 @@ const AdminPaymentMethods = () => {
               <h3 className="text-xl font-bold text-slate-900">
                 {editingMethod ? 'Edit Payment Method' : 'Add Payment Method'}
               </h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
-                <XCircle className="h-6 w-6" />
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X className="h-6 w-6" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Type</label>
-                <div className="flex gap-4">
-                  <button
+            <div className="max-h-[80vh] overflow-y-auto">
+              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Type</label>
+                  <div className="flex gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, type: 'bank' })}
+                      className={`flex-1 py-3 rounded-xl border-2 flex items-center justify-center gap-2 font-bold transition-all ${
+                        formData.type === 'bank' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-100 text-slate-500 hover:border-slate-200'
+                      }`}
+                    >
+                      <Banknote className="h-5 w-5" />
+                      Bank
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, type: 'crypto' })}
+                      className={`flex-1 py-3 rounded-xl border-2 flex items-center justify-center gap-2 font-bold transition-all ${
+                        formData.type === 'crypto' ? 'border-orange-500 bg-orange-500 text-white' : 'border-slate-100 text-slate-500 hover:border-slate-200'
+                      }`}
+                    >
+                      <Bitcoin className="h-5 w-5" />
+                      Crypto
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">
+                    {formData.type === 'bank' ? 'Bank Name' : 'Crypto Name (e.g. BTC, USDT)'}
+                  </label>
+                  <input 
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    placeholder={formData.type === 'bank' ? 'e.g. Chase Bank' : 'e.g. Bitcoin (BTC)'}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">
+                    {formData.type === 'bank' ? 'Account Number / IBAN' : 'Wallet Address'}
+                  </label>
+                  <input 
+                    type="text"
+                    required
+                    value={formData.details}
+                    onChange={(e) => setFormData({ ...formData, details: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 font-mono"
+                    placeholder={formData.type === 'bank' ? 'Enter account number' : 'Enter wallet address'}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Instructions (Optional)</label>
+                  <textarea 
+                    value={formData.instructions}
+                    onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 h-24 resize-none"
+                    placeholder="e.g. Include your name in the reference"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox"
+                    id="is_active"
+                    checked={formData.is_active === 1}
+                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked ? 1 : 0 })}
+                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
+                  />
+                  <label htmlFor="is_active" className="text-sm font-medium text-slate-700">Active and visible to customers</label>
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button 
                     type="button"
-                    onClick={() => setFormData({ ...formData, type: 'bank' })}
-                    className={`flex-1 py-3 rounded-xl border-2 flex items-center justify-center gap-2 font-bold transition-all ${
-                      formData.type === 'bank' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-100 text-slate-500 hover:border-slate-200'
-                    }`}
+                    onClick={() => setShowModal(false)}
+                    className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all"
                   >
-                    <Banknote className="h-5 w-5" />
-                    Bank
+                    Cancel
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, type: 'crypto' })}
-                    className={`flex-1 py-3 rounded-xl border-2 flex items-center justify-center gap-2 font-bold transition-all ${
-                      formData.type === 'crypto' ? 'border-orange-500 bg-orange-500 text-white' : 'border-slate-100 text-slate-500 hover:border-slate-200'
-                    }`}
+                  <button 
+                    type="submit"
+                    className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all"
                   >
-                    <Bitcoin className="h-5 w-5" />
-                    Crypto
+                    {editingMethod ? 'Save Changes' : 'Add Method'}
                   </button>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">
-                  {formData.type === 'bank' ? 'Bank Name' : 'Crypto Name (e.g. BTC, USDT)'}
-                </label>
-                <input 
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                  placeholder={formData.type === 'bank' ? 'e.g. Chase Bank' : 'e.g. Bitcoin (BTC)'}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">
-                  {formData.type === 'bank' ? 'Account Number / IBAN' : 'Wallet Address'}
-                </label>
-                <input 
-                  type="text"
-                  required
-                  value={formData.details}
-                  onChange={(e) => setFormData({ ...formData, details: e.target.value })}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 font-mono"
-                  placeholder={formData.type === 'bank' ? 'Enter account number' : 'Enter wallet address'}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Instructions (Optional)</label>
-                <textarea 
-                  value={formData.instructions}
-                  onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 h-24 resize-none"
-                  placeholder="e.g. Include your name in the reference"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input 
-                  type="checkbox"
-                  id="is_active"
-                  checked={formData.is_active === 1}
-                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked ? 1 : 0 })}
-                  className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
-                />
-                <label htmlFor="is_active" className="text-sm font-medium text-slate-700">Active and visible to customers</label>
-              </div>
-
-              <div className="pt-4 flex gap-3">
-                <button 
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all"
-                >
-                  {editingMethod ? 'Save Changes' : 'Add Method'}
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
         </div>
       )}

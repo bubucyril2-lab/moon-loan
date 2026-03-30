@@ -4,6 +4,7 @@ import {
   Clock, 
   CheckCircle2, 
   XCircle, 
+  X,
   AlertCircle,
   Loader2,
   TrendingUp,
@@ -117,9 +118,15 @@ const CustomerLoans = () => {
 
   const fetchLoans = async () => {
     if (!user) return;
-    const allLoans = await storageService.getLoans();
-    setLoans(allLoans.filter(l => l.userId === user.id).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
-    setIsLoading(false);
+    try {
+      const userLoans = await storageService.getLoansByUserId(user.id);
+      setLoans(userLoans.sort((a, b) => new Date(b.created_at || b.createdAt || '').getTime() - new Date(a.created_at || a.createdAt || '').getTime()));
+    } catch (error) {
+      console.error('Error fetching loans:', error);
+      toast.error('Failed to load loans');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const fetchPaymentMethods = async () => {
@@ -406,12 +413,12 @@ const CustomerLoans = () => {
                   <p className="text-xs text-slate-500">Official channels for loan repayment</p>
                 </div>
               </div>
-              <button onClick={() => setShowPaymentModal(false)} className="text-slate-400 hover:text-slate-600">
-                <XCircle className="h-6 w-6" />
+              <button onClick={() => setShowPaymentModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X className="h-6 w-6" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+            <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
               <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex gap-3">
                 <Info className="h-5 w-5 text-emerald-600 flex-shrink-0" />
                 <p className="text-xs text-emerald-700 leading-relaxed">
@@ -497,12 +504,12 @@ const CustomerLoans = () => {
                   <p className="text-xs text-slate-500">Final step before submission</p>
                 </div>
               </div>
-              <button onClick={() => setShowReviewModal(false)} className="text-slate-400 hover:text-slate-600">
-                <XCircle className="h-6 w-6" />
+              <button onClick={() => setShowReviewModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X className="h-6 w-6" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+            <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
               <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-500">Loan Amount</span>

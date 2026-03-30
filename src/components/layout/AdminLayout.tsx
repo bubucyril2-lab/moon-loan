@@ -24,10 +24,19 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const AdminLayout = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isLoading && user && user.role !== 'admin') {
+      navigate('/dashboard');
+    }
+  }, [user, isLoading, navigate]);
+
+  if (isLoading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  if (!user || user.role !== 'admin') return null;
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Overview', path: '/admin' },
@@ -60,7 +69,7 @@ const AdminLayout = () => {
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
-          <Link to="/" className="p-6 flex items-center gap-3">
+          <Link to="/admin" className="p-6 flex items-center gap-3">
             <Landmark className="h-8 w-8 text-emerald-500" />
             <span className="text-xl font-bold text-white tracking-tight">MOONSTONE</span>
           </Link>
@@ -127,7 +136,10 @@ const AdminLayout = () => {
             </button>
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-sm font-bold text-slate-900">{user?.fullName}</span>
-              <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded uppercase tracking-tighter">System Administrator</span>
+              <span className="text-[10px] text-slate-500">{user?.email}</span>
+              <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded uppercase tracking-tighter">
+                {user?.role === 'admin' ? 'System Administrator' : 'Customer Account'}
+              </span>
             </div>
             <div className="w-10 h-10 bg-slate-900 rounded-full flex items-center justify-center border border-slate-800 overflow-hidden">
               {user?.profilePicture ? (

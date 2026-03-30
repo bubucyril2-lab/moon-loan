@@ -29,12 +29,18 @@ const CustomerHistory = () => {
   useEffect(() => {
     const fetchTransactions = async () => {
       if (!user) return;
-      const account = await storageService.getAccountByUserId(user.id);
-      if (account) {
-        const txs = await storageService.getTransactionsByAccountId(account.id);
-        setTransactions(txs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      try {
+        const account = await storageService.getAccountByUserId(user.id);
+        if (account) {
+          const txs = await storageService.getTransactionsByAccountId(account.id, user.id);
+          setTransactions(txs.sort((a, b) => new Date(b.created_at || b.createdAt || '').getTime() - new Date(a.created_at || a.createdAt || '').getTime()));
+        }
+      } catch (error) {
+        console.error('Error fetching transactions:', error);
+        toast.error('Failed to load transactions');
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     fetchTransactions();
   }, [user]);

@@ -41,7 +41,10 @@ interface AdminStats {
   pendingApprovals: number;
   activeAccounts: number;
   totalSystemBalance: number;
-  pinsNotSet: number;
+  activeLoans: number;
+  pendingLoans: number;
+  totalDisbursed: number;
+  totalRepayments: number;
 }
 
 const AdminDashboard = () => {
@@ -59,19 +62,28 @@ const AdminDashboard = () => {
         const users = await storageService.getUsers();
         const accounts = await storageService.getAccounts();
         const logs = await storageService.getAuditLogs();
+        const loans = await storageService.getLoans();
 
         const customers = users.filter(u => u.role === 'customer');
         const pending = customers.filter(u => u.status === 'pending').length;
         const active = accounts.filter(a => a.status === 'active').length;
         const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
-        const pinsNotSetCount = accounts.filter(a => !a.pin).length;
+
+        // Loan stats
+        const activeLoans = loans.filter(l => l.status === 'approved' || l.status === 'repaying');
+        const pendingLoans = loans.filter(l => l.status === 'pending');
+        const totalDisbursed = activeLoans.reduce((sum, l) => sum + l.amount, 0);
+        const totalRepayments = loans.filter(l => l.status === 'completed').reduce((sum, l) => sum + l.amount, 0);
 
         setStats({
           totalCustomers: customers.length,
           pendingApprovals: pending,
           activeAccounts: active,
           totalSystemBalance: totalBalance,
-          pinsNotSet: pinsNotSetCount
+          activeLoans: activeLoans.length,
+          pendingLoans: pendingLoans.length,
+          totalDisbursed,
+          totalRepayments
         });
 
         // Mock growth data based on transactions
@@ -140,19 +152,25 @@ const AdminDashboard = () => {
 
   if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>;
 
-  const statCards = [
+  const mainStats = [
     { label: 'Total Customers', value: stats?.totalCustomers || 0, icon: Users, color: 'bg-blue-500' },
     { label: 'Pending Approvals', value: stats?.pendingApprovals || 0, icon: UserCheck, color: 'bg-amber-500' },
     { label: 'Active Accounts', value: stats?.activeAccounts || 0, icon: Activity, color: 'bg-emerald-500' },
-    { label: 'PINs Not Set', value: stats?.pinsNotSet || 0, icon: ShieldAlert, color: 'bg-red-500' },
     { label: 'System Balance', value: `$${(stats?.totalSystemBalance || 0).toLocaleString()}`, icon: DollarSign, color: 'bg-slate-900' },
+  ];
+
+  const loanStats = [
+    { label: 'Active Loans', value: stats?.activeLoans || 0, icon: Banknote, color: 'bg-indigo-500' },
+    { label: 'Pending Requests', value: stats?.pendingLoans || 0, icon: Clock, color: 'bg-orange-500' },
+    { label: 'Total Disbursed', value: `$${(stats?.totalDisbursed || 0).toLocaleString()}`, icon: TrendingUp, color: 'bg-emerald-600' },
+    { label: 'Total Repayments', value: `$${(stats?.totalRepayments || 0).toLocaleString()}`, icon: ArrowDownLeft, color: 'bg-blue-600' },
   ];
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Welcome back, Admin</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Welcome back, {user?.fullName || 'Admin'}</h2>
           <p className="text-slate-500">Here's what's happening with Moonstone Saving Bank today.</p>
         </div>
         <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
@@ -162,12 +180,33 @@ const AdminDashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat, i) => (
+        {mainStats.map((stat, i) => (
           <motion.div 
             key={i} 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
+            className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-all"
+          >
+            <div className="relative z-10">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{stat.label}</p>
+              <h3 className="text-2xl font-bold text-slate-900">{stat.value}</h3>
+            </div>
+            <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform`}>
+              <stat.icon className="h-12 w-12" />
+            </div>
+            <div className={`absolute bottom-0 left-0 h-1 w-full ${stat.color}`}></div>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {loanStats.map((stat, i) => (
+          <motion.div 
+            key={i} 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: (i + 4) * 0.1 }}
             className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-all"
           >
             <div className="relative z-10">

@@ -1,8 +1,10 @@
 {
+  "projectId": "moon2-65d32",
+  "appId": "1:866724596112:web:f7b52502ccc3a3cf4a8b15",
   "apiKey": "AIzaSyDhPdnMeN-TbAhOrW8D_q6tcgWnKkSesQs",
   "authDomain": "moon2-65d32.firebaseapp.com",
-  "projectId": "moon2-65d32",
+  "firestoreDatabaseId": "ai-studio-cb542c46-6dff-42ea-9720-def913ebd9cb",
   "storageBucket": "moon2-65d32.firebasestorage.app",
   "messagingSenderId": "866724596112",
-  "appId": "1:866724596112:web:ac2030ece93f47eb4a8b15"
+  "measurementId": ""
 }
