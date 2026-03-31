@@ -33,7 +33,6 @@ export const useChat = (otherUserId?: string) => {
         createdAt: new Date().toISOString()
       };
       await storageService.saveChatMessage(newMessage);
-      setMessages(prev => [...prev, newMessage]);
     }
   }, [otherUserId, user]);
 

@@ -16,7 +16,7 @@ import { safeFormat } from '../../utils/date';
 import { storageService } from '../../services/storage';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
-import { Globe, MapPin, Calendar, Phone, Mail, Home } from 'lucide-react';
+import { Globe, MapPin, Calendar, Mail } from 'lucide-react';
 
 import TradingChart from '../../components/TradingChart';
 
@@ -91,14 +91,6 @@ const CustomerDashboard = () => {
             <div className="flex items-center gap-1.5 text-slate-600 text-sm">
               <Mail className="h-4 w-4 text-emerald-600" />
               <span className="font-bold text-slate-900">Email:</span> {user?.email || 'Not provided'}
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-600 text-sm">
-              <Phone className="h-4 w-4 text-emerald-600" />
-              <span className="font-bold text-slate-900">Phone:</span> {user?.phoneNumber || 'Not provided'}
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-600 text-sm">
-              <Home className="h-4 w-4 text-emerald-600" />
-              <span className="font-bold text-slate-900">Address:</span> {user?.address || 'Not provided'}
             </div>
           </div>
         </div>
