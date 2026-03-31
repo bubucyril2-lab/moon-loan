@@ -1,29 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  Wallet, 
   ArrowUpRight, 
   ArrowDownLeft, 
   CreditCard, 
-  Plus,
   TrendingUp,
   Clock,
-  X,
-  Loader2,
-  ArrowRight,
   Send,
   Banknote,
-  Lock,
   User as UserIcon,
   ShieldCheck 
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Account, Transaction } from '../../types';
 import { safeFormat } from '../../utils/date';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { storageService } from '../../services/storage';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
-import { Globe, MapPin, Calendar } from 'lucide-react';
+import { Globe, MapPin, Calendar, Phone, Mail, Home } from 'lucide-react';
 
 import TradingChart from '../../components/TradingChart';
 
@@ -32,9 +25,6 @@ const CustomerDashboard = () => {
   const [account, setAccount] = useState<Account | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showModal, setShowModal] = useState<'deposit' | 'withdraw' | null>(null);
-  const [amount, setAmount] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -61,56 +51,6 @@ const CustomerDashboard = () => {
     // but for this demo, simple load is enough.
   }, [user]);
 
-  const handleAction = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!account || !user) return;
-    
-    const val = parseFloat(amount);
-    if (isNaN(val) || val <= 0) {
-      toast.error('Please enter a valid amount');
-      return;
-    }
-
-    if (showModal === 'withdraw' && val > account.balance) {
-      toast.error('Insufficient balance');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const newBalance = showModal === 'deposit' 
-        ? account.balance + val 
-        : account.balance - val;
-
-      const updatedAccount = { ...account, balance: newBalance };
-      await storageService.saveAccount(updatedAccount);
-      setAccount(updatedAccount);
-
-      const newTransaction: Transaction = {
-        id: Math.random().toString(36).substring(2, 15),
-        accountId: account.id,
-        userId: user.id,
-        type: showModal === 'deposit' ? 'credit' : 'debit',
-        amount: val,
-        description: `${showModal === 'deposit' ? 'Deposit' : 'Withdrawal'} to account`,
-        status: 'completed',
-        createdAt: new Date().toISOString(),
-        created_at: new Date().toISOString()
-      };
-
-      await storageService.saveTransaction(newTransaction);
-      setTransactions([newTransaction, ...transactions]);
-
-      toast.success(`${showModal === 'deposit' ? 'DEPOSIT' : 'WITHDRAWAL'} SUCCESSFUL`);
-      setShowModal(null);
-      setAmount('');
-    } catch (error: any) {
-      toast.error(error.message || 'An error occurred');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   if (isLoading) return <div className="animate-pulse space-y-8">
     <div className="h-32 bg-slate-200 rounded-2xl w-full"></div>
     <div className="grid md:grid-cols-3 gap-6">
@@ -135,50 +75,88 @@ const CustomerDashboard = () => {
         </div>
         <div className="flex-1 text-center md:text-left">
           <h2 className="text-2xl font-bold text-slate-900">{user?.fullName}</h2>
-          <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-2">
-            <div className="flex items-center gap-1.5 text-slate-500 text-sm">
-              <Globe className="h-4 w-4" />
-              {user?.country || 'N/A'}
+          <div className="flex flex-wrap justify-center md:justify-start gap-x-6 gap-y-2 mt-3">
+            <div className="flex items-center gap-1.5 text-slate-600 text-sm">
+              <Globe className="h-4 w-4 text-emerald-600" />
+              <span className="font-bold text-slate-900">Country:</span> {user?.country || 'Not provided'}
             </div>
-            <div className="flex items-center gap-1.5 text-slate-500 text-sm">
-              <MapPin className="h-4 w-4" />
-              {user?.city || 'N/A'}
+            <div className="flex items-center gap-1.5 text-slate-600 text-sm">
+              <MapPin className="h-4 w-4 text-emerald-600" />
+              <span className="font-bold text-slate-900">City:</span> {user?.city || 'Not provided'}
             </div>
-            <div className="flex items-center gap-1.5 text-slate-500 text-sm">
-              <Calendar className="h-4 w-4" />
-              {user?.age || 'N/A'} years old
+            <div className="flex items-center gap-1.5 text-slate-600 text-sm">
+              <Calendar className="h-4 w-4 text-emerald-600" />
+              <span className="font-bold text-slate-900">Age:</span> {user?.age ? `${user.age} years old` : 'Not provided'}
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-600 text-sm">
+              <Mail className="h-4 w-4 text-emerald-600" />
+              <span className="font-bold text-slate-900">Email:</span> {user?.email || 'Not provided'}
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-600 text-sm">
+              <Phone className="h-4 w-4 text-emerald-600" />
+              <span className="font-bold text-slate-900">Phone:</span> {user?.phoneNumber || 'Not provided'}
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-600 text-sm">
+              <Home className="h-4 w-4 text-emerald-600" />
+              <span className="font-bold text-slate-900">Address:</span> {user?.address || 'Not provided'}
             </div>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Link to="/dashboard/settings?tab=Profile" className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all">
-            Edit Profile
-          </Link>
         </div>
       </div>
 
-      {/* Welcome & Balance */}
+      {/* Virtual Card & Balance */}
       <div className="grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-slate-900 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl shadow-slate-900/20">
-          <div className="relative z-10">
-            <p className="text-slate-400 font-medium mb-2">Available Balance</p>
-            <h2 className="text-5xl font-bold mb-8">${account?.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h2>
-            <div className="flex items-center gap-6">
+        <div className="lg:col-span-2 relative group">
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl shadow-slate-900/40 min-h-[320px] flex flex-col justify-between border border-white/10">
+            {/* Card Header */}
+            <div className="relative z-10 flex justify-between items-start">
               <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Account Number</p>
-                <p className="font-mono text-lg tracking-widest">{account?.accountNumber.replace(/(\d{4})/g, '$1 ')}</p>
+                <p className="text-emerald-500 font-black tracking-[0.2em] text-sm mb-1">ECONEST BANK</p>
+                <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Virtual Debit Card</p>
               </div>
-              <div className="h-10 w-px bg-slate-700"></div>
-              <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Account Type</p>
-                <p className="font-bold">ECONEST Premium</p>
+              <div className="w-12 h-10 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg relative overflow-hidden shadow-inner">
+                <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)]"></div>
+                <div className="grid grid-cols-2 gap-px h-full p-1 opacity-40">
+                  <div className="border-r border-b border-black/20"></div>
+                  <div className="border-b border-black/20"></div>
+                  <div className="border-r border-black/20"></div>
+                  <div></div>
+                </div>
               </div>
             </div>
+
+            {/* Card Number */}
+            <div className="relative z-10 my-8">
+              <p className="text-xs text-slate-500 uppercase tracking-[0.3em] font-bold mb-3 opacity-60">Card Number</p>
+              <p className="font-mono text-3xl md:text-4xl tracking-[0.15em] text-slate-100 drop-shadow-lg">
+                {account?.accountNumber.replace(/(\d{4})/g, '$1 ').trim()}
+              </p>
+            </div>
+
+            {/* Card Footer */}
+            <div className="relative z-10 flex justify-between items-end">
+              <div className="space-y-1">
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold opacity-60">Card Holder</p>
+                <p className="text-xl font-bold tracking-wide text-slate-200 uppercase">{user?.fullName}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold opacity-60 mb-1">Balance</p>
+                <p className="text-3xl font-black text-emerald-400">
+                  ${account?.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+
+            {/* Decorative Elements */}
+            <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+              <ShieldCheck className="h-48 w-48" />
+            </div>
+            <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-emerald-500/10 blur-[100px] rounded-full pointer-events-none"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.03)_0%,_transparent_70%)] pointer-events-none"></div>
           </div>
-          <div className="absolute top-0 right-0 p-8 opacity-20">
-            <Wallet className="h-32 w-32" />
-          </div>
-          <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-emerald-500/20 blur-3xl rounded-full"></div>
+          
+          {/* Card Hover Effect Glow */}
+          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 to-blue-500/20 rounded-[2.6rem] blur opacity-0 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 pointer-events-none"></div>
         </div>
 
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm flex flex-col justify-between">
@@ -188,20 +166,6 @@ const CustomerDashboard = () => {
               Quick Actions
             </h3>
             <div className="grid grid-cols-2 gap-4">
-              <button 
-                onClick={() => setShowModal('deposit')}
-                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-emerald-50 hover:border-emerald-100 transition-all group"
-              >
-                <Plus className="h-6 w-6 text-slate-600 group-hover:text-emerald-600 mb-2" />
-                <span className="text-xs font-bold text-slate-600 group-hover:text-emerald-600">Deposit</span>
-              </button>
-              <button 
-                onClick={() => setShowModal('withdraw')}
-                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-red-50 hover:border-red-100 transition-all group"
-              >
-                <ArrowUpRight className="h-6 w-6 text-slate-600 group-hover:text-red-600 mb-2" />
-                <span className="text-xs font-bold text-slate-600 group-hover:text-red-600">Withdraw</span>
-              </button>
               <Link 
                 to="/dashboard/transfers"
                 className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-blue-50 hover:border-blue-100 transition-all group"
@@ -281,59 +245,6 @@ const CustomerDashboard = () => {
           <TradingChart />
         </div>
       </div>
-
-      {/* Modals */}
-      {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div 
-            className="absolute inset-0" 
-            onClick={() => setShowModal(null)}
-          />
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative z-10 overflow-hidden">
-            <button 
-              onClick={() => setShowModal(null)}
-              className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all z-20"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <div className="p-8 max-h-[80vh] overflow-y-auto">
-              <h3 className="text-xl font-bold text-slate-900 mb-2 capitalize">{showModal} Funds</h3>
-              <p className="text-sm text-slate-500 mb-8">Enter the amount you wish to {showModal}.</p>
-              
-              <form onSubmit={handleAction} className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Amount ($)</label>
-                  <input 
-                    type="number" 
-                    required
-                    min="1"
-                    step="0.01"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold text-lg"
-                    autoFocus
-                  />
-                </div>
-                <button 
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`w-full py-4 rounded-2xl font-bold text-white transition-all flex items-center justify-center gap-2 ${
-                    showModal === 'deposit' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-900 hover:bg-slate-800'
-                  }`}
-                >
-                  {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : (
-                    <>
-                      Confirm {showModal}
-                      <ArrowRight className="h-5 w-5" />
-                    </>
-                  )}
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

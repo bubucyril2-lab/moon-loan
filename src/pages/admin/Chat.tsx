@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, User, Send, MessageSquare, ShieldCheck, Loader2 } from 'lucide-react';
+import { Search, User, Send, MessageSquare, ShieldCheck, Loader2, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../hooks/useChat';
 import { storageService } from '../../services/storage';
@@ -55,9 +55,9 @@ const AdminChat = () => {
   );
 
   return (
-    <div className="h-[calc(100vh-12rem)] flex gap-8">
+    <div className="h-[calc(100vh-12rem)] flex flex-col md:flex-row gap-4 md:gap-8">
       {/* Customer List */}
-      <div className="w-80 bg-white border border-slate-200 rounded-3xl flex flex-col overflow-hidden shadow-sm">
+      <div className={`${selectedCustomer ? 'hidden md:flex' : 'flex'} w-full md:w-80 bg-white border border-slate-200 rounded-3xl flex-col overflow-hidden shadow-sm`}>
         <div className="p-6 border-b border-slate-100">
           <h3 className="font-bold text-slate-900 mb-4">Conversations</h3>
           <div className="relative">
@@ -95,11 +95,17 @@ const AdminChat = () => {
       </div>
 
       {/* Chat Window */}
-      <div className="flex-1 bg-white border border-slate-200 rounded-3xl flex flex-col overflow-hidden shadow-sm">
+      <div className={`${selectedCustomer ? 'flex' : 'hidden md:flex'} flex-1 bg-white border border-slate-200 rounded-3xl flex-col overflow-hidden shadow-sm`}>
         {selectedCustomer ? (
           <>
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setSelectedCustomer(null)}
+                  className="md:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
                 <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
                   <User className="h-5 w-5 text-slate-600" />
                 </div>
