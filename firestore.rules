@@ -130,6 +130,7 @@ service cloud.firestore {
         ((isOwner(userId) && request.resource.data.role == 'customer') || isAdmin());
       allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
         ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+      allow delete: if isAdmin();
     }
 
     match /accounts/{accountId} {
@@ -176,11 +177,11 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
       allow create: if isAdmin();
       allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && 
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
     }
 
     match /chat_messages/{chatId} {
