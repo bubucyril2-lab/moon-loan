@@ -66,11 +66,16 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (request.auth.token.email == "bubucyril2@gmail.com" ||
-         request.auth.token.email == "admin@gmail.com" ||
-         request.auth.token.email == "admin@econestbank.com" ||
+        ((request.auth.token.email != null && 
+          request.auth.token.email.lower() in ["bubucyril2@gmail.com", "admin@gmail.com", "admin@econestbank.com"]) ||
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function roleIs(role) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
 
     function hasRequiredFields(fields) {
@@ -137,7 +142,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (
         isAdmin() || 
         resource.data.userId == request.auth.uid ||
-        // Allow querying by accountNumber for transfers
+        request.query.filters.userId == request.auth.uid ||
         (request.query.limit <= 1 && request.query.filters.accountNumber != null)
       );
       allow create: if isAuthenticated() && (
@@ -169,7 +174,7 @@ service cloud.firestore {
     //   - created_at: string (required, ISO 8601)
     // ===============================================================
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid || request.query.filters.userId == request.auth.uid);
       allow create: if isAuthenticated() && isValidTransaction(request.resource.data) && 
         (request.auth.uid == request.resource.data.userId || isAdmin());
       allow update: if isAdmin();
@@ -177,36 +182,36 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
-      allow create: if isAdmin();
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid || request.query.filters.userId == request.auth.uid);
+      allow create: if isAuthenticated(); // Allow users to create notifications for others (e.g. transfers) or admin
       allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && 
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
       allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
     }
 
     match /chat_messages/{chatId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid || request.query.filters.userId == request.auth.uid);
       allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.userId || isAdmin());
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     match /loans/{loanId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid || request.query.filters.userId == request.auth.uid);
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     match /deposits/{depositId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid || request.query.filters.userId == request.auth.uid);
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     match /beneficiaries/{beneficiaryId} {
-      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid || request.query.filters.userId == request.auth.uid);
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
       allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;

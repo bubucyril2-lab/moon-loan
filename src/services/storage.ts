@@ -108,7 +108,7 @@ class StorageService {
 
   async getAccountByUserId(userId: string): Promise<Account | undefined> {
     try {
-      const q = query(collection(db, 'accounts'), where('userId', '==', userId));
+      const q = query(collection(db, 'accounts'), where('userId', '==', userId), limit(1));
       const snapshot = await getDocs(q);
       return snapshot.empty ? undefined : snapshot.docs[0].data() as Account;
     } catch (error) {
@@ -119,7 +119,7 @@ class StorageService {
 
   async getAccountByAccountNumber(accountNumber: string): Promise<Account | undefined> {
     try {
-      const q = query(collection(db, 'accounts'), where('accountNumber', '==', accountNumber));
+      const q = query(collection(db, 'accounts'), where('accountNumber', '==', accountNumber), limit(1));
       const snapshot = await getDocs(q);
       return snapshot.empty ? undefined : snapshot.docs[0].data() as Account;
     } catch (error) {

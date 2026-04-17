@@ -28,7 +28,7 @@ const CustomerTransfers = () => {
   const [bankName, setBankName] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [swiftCode, setSwiftCode] = useState('');
-  const [transferType, setTransferType] = useState<'internal' | 'local' | 'international'>('internal');
+  const [transferType, setTransferType] = useState<'local' | 'international'>('local');
   const [currency, setCurrency] = useState('USD');
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState(1); // 1: Form, 2: Confirmation, 3: Success
@@ -100,7 +100,7 @@ const CustomerTransfers = () => {
 
     try {
       const transferAmount = parseFloat(amount);
-      const fee = transferType === 'internal' ? 0 : transferType === 'local' ? 5 : 25;
+      const fee = transferType === 'local' ? 5 : 25;
       const totalDebit = transferAmount + fee;
 
       if (account.balance < totalDebit) {
@@ -136,43 +136,6 @@ const CustomerTransfers = () => {
         reference_id: `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
         created_at: new Date().toISOString()
       });
-
-      // If internal, update recipient account
-      if (transferType === 'internal') {
-        const recipientAcc = await storageService.getAccountByAccountNumber(recipientAccount);
-        if (recipientAcc) {
-          await storageService.saveAccount({
-            ...recipientAcc,
-            balance: recipientAcc.balance + transferAmount
-          });
-
-          await storageService.saveTransaction({
-            id: Math.random().toString(36).substr(2, 9),
-            accountId: recipientAcc.id,
-            userId: recipientAcc.userId,
-            amount: transferAmount,
-            type: 'credit',
-            description: `Transfer from ${user.fullName || user.full_name}`,
-            status: 'completed',
-            reference_id: `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-            created_at: new Date().toISOString()
-          });
-
-          await storageService.saveNotification({
-            id: Math.random().toString(36).substr(2, 9),
-            userId: recipientAcc.userId,
-            title: 'Funds Received',
-            message: `You have received $${transferAmount.toLocaleString()} from ${user.fullName || user.full_name}.`,
-            type: 'success',
-            isRead: false,
-            read: false,
-            createdAt: new Date().toISOString(),
-            created_at: new Date().toISOString()
-          });
-        } else {
-          console.warn('Recipient account not found or access denied. Proceeding with debit only.');
-        }
-      }
 
       setStep(3);
       toast.success('TRANSFER SUCCESSFUL');
@@ -242,30 +205,24 @@ const CustomerTransfers = () => {
         </button>
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Send Money</h2>
-          <p className="text-slate-500">Transfer funds securely {transferType === 'internal' ? 'to any ECONEST BANK account' : 'to other banks'}</p>
-        </div>
+          <p className="text-slate-500">Transfer funds securely to other banks</p>
       </div>
+    </div>
 
-      <div className="flex p-1 bg-slate-100 rounded-2xl w-full max-w-2xl">
-        <button 
-          onClick={() => { setTransferType('internal'); setStep(1); }}
-          className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${transferType === 'internal' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          Internal
-        </button>
-        <button 
-          onClick={() => { setTransferType('local'); setStep(1); }}
-          className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${transferType === 'local' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          Local Transfer
-        </button>
-        <button 
-          onClick={() => { setTransferType('international'); setStep(1); }}
-          className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${transferType === 'international' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          International
-        </button>
-      </div>
+    <div className="flex p-1 bg-slate-100 rounded-2xl w-full max-w-2xl">
+      <button 
+        onClick={() => { setTransferType('local'); setStep(1); }}
+        className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${transferType === 'local' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+      >
+        Local Transfer
+      </button>
+      <button 
+        onClick={() => { setTransferType('international'); setStep(1); }}
+        className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${transferType === 'international' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+      >
+        International
+      </button>
+    </div>
 
       {!user?.transactionPin && (
         <div className="bg-amber-50 border border-amber-100 rounded-2xl p-6 flex gap-4 items-center">
@@ -331,34 +288,33 @@ const CustomerTransfers = () => {
                     </div>
                   </div>
 
-                  {transferType !== 'internal' && (
-                    <div className="grid md:grid-cols-2 gap-6">
+                  {/* Bank Name always required since internal is removed */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <label className="block text-sm font-bold text-slate-700">Bank Name</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={bankName}
+                        onChange={(e) => setBankName(e.target.value)}
+                        placeholder="Enter recipient's bank name"
+                        className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      />
+                    </div>
+                    {transferType === 'international' && (
                       <div className="space-y-4">
-                        <label className="block text-sm font-bold text-slate-700">Bank Name</label>
+                        <label className="block text-sm font-bold text-slate-700">SWIFT / BIC Code</label>
                         <input 
                           type="text" 
                           required
-                          value={bankName}
-                          onChange={(e) => setBankName(e.target.value)}
-                          placeholder="Enter recipient's bank name"
-                          className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                          value={swiftCode}
+                          onChange={(e) => setSwiftCode(e.target.value.toUpperCase())}
+                          placeholder="Enter SWIFT code"
+                          className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
                         />
                       </div>
-                      {transferType === 'international' && (
-                        <div className="space-y-4">
-                          <label className="block text-sm font-bold text-slate-700">SWIFT / BIC Code</label>
-                          <input 
-                            type="text" 
-                            required
-                            value={swiftCode}
-                            onChange={(e) => setSwiftCode(e.target.value.toUpperCase())}
-                            placeholder="Enter SWIFT code"
-                            className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-4">
@@ -437,7 +393,7 @@ const CustomerTransfers = () => {
                     </div>
                     <div className="flex justify-between py-3 border-b border-slate-100">
                       <span className="text-slate-500">Bank Name</span>
-                      <span className="font-bold text-slate-900">{transferType === 'internal' ? 'ECONEST BANK' : bankName}</span>
+                      <span className="font-bold text-slate-900">{bankName}</span>
                     </div>
                     {transferType === 'international' && (
                       <div className="flex justify-between py-3 border-b border-slate-100">
@@ -458,18 +414,18 @@ const CustomerTransfers = () => {
                     <div className="flex justify-between py-3 border-b border-slate-100">
                       <span className="text-slate-500">Transfer Fee</span>
                       <span className="font-bold text-emerald-600">
-                        {transferType === 'internal' ? '$0.00 (Free)' : transferType === 'local' ? '$5.00' : '$25.00'}
+                        {transferType === 'local' ? '$5.00' : '$25.00'}
                       </span>
                     </div>
                     <div className="flex justify-between py-4 bg-slate-50 px-4 rounded-xl mt-2">
                       <span className="text-slate-700 font-bold">Total to be Debited</span>
                       <span className="font-bold text-slate-900 text-lg">
-                        ${(parseFloat(amount) + (transferType === 'internal' ? 0 : transferType === 'local' ? 5 : 25)).toLocaleString()}
+                        ${(parseFloat(amount) + (transferType === 'local' ? 5 : 25)).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                       <span>Estimated Balance After</span>
-                      <span>${((account?.balance || 0) - (parseFloat(amount) + (transferType === 'internal' ? 0 : transferType === 'local' ? 5 : 25))).toLocaleString()}</span>
+                      <span>${((account?.balance || 0) - (parseFloat(amount) + (transferType === 'local' ? 5 : 25))).toLocaleString()}</span>
                     </div>
                   </div>
 
