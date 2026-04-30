@@ -17,30 +17,32 @@ const PublicNavbar = () => {
           <div className="flex items-center">
             <Link to="/" className="flex items-center gap-2">
               <Landmark className="h-8 w-8 text-emerald-600" />
-              <span className="text-xl font-bold text-slate-900 tracking-tight">ECONEST BANK</span>
+              <span className="text-xl font-bold text-slate-900 tracking-tight">ECONEST <span className="hidden sm:inline">BANK</span></span>
             </Link>
           </div>
           
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="flex items-center gap-4">
             <GoogleTranslate />
-            <Link to="/" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">Home</Link>
-            <Link to="/about" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">About</Link>
-            <Link to="/services" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">Services</Link>
-            <Link to="/contact" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">Contact</Link>
-            {user ? (
-              <Link to={dashboardPath} className="bg-emerald-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-all shadow-sm">Dashboard</Link>
-            ) : (
-              <>
-                <Link to="/login" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">Login</Link>
-                <Link to="/register" className="bg-emerald-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-all shadow-sm">Open Account</Link>
-              </>
-            )}
-          </div>
+            <div className="hidden md:flex items-center space-x-8">
+              <Link to="/" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">Home</Link>
+              <Link to="/about" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">About</Link>
+              <Link to="/services" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">Services</Link>
+              <Link to="/contact" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">Contact</Link>
+              {user ? (
+                <Link to={dashboardPath} className="bg-emerald-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-all shadow-sm">Dashboard</Link>
+              ) : (
+                <>
+                  <Link to="/login" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">Login</Link>
+                  <Link to="/register" className="bg-emerald-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-all shadow-sm">Open Account</Link>
+                </>
+              )}
+            </div>
 
-          <div className="md:hidden flex items-center">
-            <button onClick={() => setIsOpen(!isOpen)} className="text-slate-600">
-              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
+            <div className="md:hidden flex items-center">
+              <button onClick={() => setIsOpen(!isOpen)} className="text-slate-600 mr-2">
+                {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </button>
+            </div>
           </div>
         </div>
       </div>

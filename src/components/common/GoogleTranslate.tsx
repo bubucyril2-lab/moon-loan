@@ -66,8 +66,8 @@ const GoogleTranslate: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex items-center">
-      <div id="google_translate_element" className="google-translate-container"></div>
+    <div className="flex items-center min-w-[120px]">
+      <div id="google_translate_element" className="google-translate-container min-w-0"></div>
       <style>{`
         .goog-te-gadget-simple {
           background-color: transparent !important;

@@ -18,6 +18,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import NotificationCenter from '../NotificationCenter';
 import GoogleTranslate from '../common/GoogleTranslate';
+import { MobileBottomNav } from './MobileBottomNav';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -46,6 +47,13 @@ const AdminLayout = () => {
     { icon: Wallet, label: 'Payment Methods', path: '/admin/payment-methods' },
     { icon: MessageSquare, label: 'Support Chat', path: '/admin/chat' },
     { icon: Settings, label: 'System Settings', path: '/admin/settings' },
+  ];
+
+  const bottomNavItems = [
+    { label: 'Overview', icon: LayoutDashboard, path: '/admin' },
+    { label: 'Customers', icon: Users, path: '/admin/customers' },
+    { label: 'Transactions', icon: ArrowRightLeft, path: '/admin/transactions' },
+    { label: 'Settings', icon: Settings, path: '/admin/settings' },
   ];
 
   const handleLogout = () => {
@@ -113,19 +121,26 @@ const AdminLayout = () => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden pb-16 lg:pb-0">
         {/* Header */}
-        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 h-16 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-30">
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="lg:hidden flex items-center gap-2 p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
-          >
-            <Menu className="h-6 w-6" />
-            <span className="text-xs font-bold uppercase tracking-wider">Menu</span>
-          </button>
+        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="lg:hidden flex items-center gap-2 p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all font-medium"
+            >
+              <Menu className="h-6 w-6" />
+              <span className="hidden sm:block text-xs font-bold uppercase tracking-wider">Menu</span>
+            </button>
+            <div className="lg:hidden">
+              <GoogleTranslate />
+            </div>
+          </div>
           
-          <div className="flex items-center gap-4">
-            <GoogleTranslate />
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="hidden lg:block">
+              <GoogleTranslate />
+            </div>
             <NotificationCenter />
             <button
               onClick={handleLogout}
@@ -159,6 +174,8 @@ const AdminLayout = () => {
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-8 max-w-full">
           <Outlet />
         </main>
+
+        <MobileBottomNav items={bottomNavItems} />
       </div>
     </div>
   );
