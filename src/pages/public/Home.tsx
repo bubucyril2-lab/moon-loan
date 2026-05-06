@@ -252,6 +252,66 @@ const Home = () => {
         </div>
       </section>
 
+      {/* Leadership Team Section */}
+      <section className="py-24 bg-slate-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">Our Leadership Team</h2>
+            <p className="text-slate-600 max-w-2xl mx-auto">Guided by decades of expertise in global finance and digital innovation.</p>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[
+              { 
+                name: 'Robert Sterling', 
+                role: 'Chief Executive Officer', 
+                image: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&h=500&q=80' 
+              },
+              { 
+                name: 'Katherine Glass', 
+                role: 'Chief Operating Officer', 
+                image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&h=500&q=80' 
+              },
+              { 
+                name: 'Arthur Wellington', 
+                role: 'Head of Global Markets', 
+                image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=400&h=500&q=80' 
+              },
+              { 
+                name: 'Margaret Vance', 
+                role: 'Chief Strategy Officer', 
+                image: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=400&h=500&q=80' 
+              }
+            ].map((staff, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="group relative overflow-hidden rounded-2xl bg-white shadow-sm border border-slate-100"
+              >
+                <div className="aspect-[4/5] overflow-hidden">
+                  <img 
+                    src={staff.image} 
+                    alt={staff.name} 
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div className="p-6">
+                  <h3 className="text-xl font-bold text-slate-900 mb-1">{staff.name}</h3>
+                  <p className="text-sm text-emerald-600 font-semibold tracking-wide uppercase">{staff.role}</p>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
+                  <p className="text-white text-xs font-medium">30+ Years experience in commercial banking</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="bg-slate-900 text-slate-400 py-16 border-t border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

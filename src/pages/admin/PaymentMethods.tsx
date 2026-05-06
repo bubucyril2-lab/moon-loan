@@ -153,8 +153,8 @@ const AdminPaymentMethods = () => {
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {methods.map((method) => (
-          <div key={method.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+        {methods.map((method, index) => (
+          <div key={method.id || index} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
             <div className="flex justify-between items-start mb-4">
               <div className={`p-3 rounded-xl ${method.type === 'bank' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
                 {method.type === 'bank' ? <Banknote className="h-6 w-6" /> : <Bitcoin className="h-6 w-6" />}

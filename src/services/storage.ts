@@ -442,7 +442,13 @@ class StorageService {
   async getPaymentMethods(): Promise<PaymentMethod[]> {
     try {
       const snapshot = await getDocs(collection(db, 'payment_methods'));
-      return snapshot.docs.map(doc => doc.data() as PaymentMethod);
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: data.id || doc.id
+        } as PaymentMethod;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, 'payment_methods');
       return [];

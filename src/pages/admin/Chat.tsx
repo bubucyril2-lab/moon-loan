@@ -120,9 +120,9 @@ const AdminChat = () => {
               ref={scrollRef}
               className="flex-1 bg-slate-50 overflow-y-auto p-6 space-y-4"
             >
-              {messages.map((msg, i) => (
+              {messages.map((msg) => (
                 <div 
-                  key={i} 
+                  key={msg.id} 
                   className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`max-w-[80%] rounded-2xl p-4 shadow-sm ${

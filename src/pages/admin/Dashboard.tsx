@@ -359,8 +359,8 @@ const AdminDashboard = () => {
             </h3>
           </div>
           <div className="p-6 space-y-4">
-            {auditLogs.slice(0, 5).map((log, i) => (
-              <div key={i} className="flex items-start gap-3 text-sm">
+            {auditLogs.slice(0, 5).map((log) => (
+              <div key={log.id} className="flex items-start gap-3 text-sm">
                 <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <Shield className="h-4 w-4 text-slate-600" />
                 </div>
