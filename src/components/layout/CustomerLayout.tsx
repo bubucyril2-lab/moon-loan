@@ -76,10 +76,19 @@ const CustomerLayout = () => {
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
-          <Link to="/dashboard" className="p-6 flex items-center gap-3">
-            <Landmark className="h-8 w-8 text-emerald-500" />
-            <span className="text-xl font-bold text-white tracking-tight">ECONEST BANK</span>
-          </Link>
+          <div className="p-6 flex items-center justify-between">
+            <Link to="/dashboard" className="flex items-center gap-3">
+              <Landmark className="h-8 w-8 text-emerald-500" />
+              <span className="text-xl font-bold text-white tracking-tight font-sans">ECONEST BANK</span>
+            </Link>
+            <button 
+              onClick={() => setIsSidebarOpen(false)}
+              className="lg:hidden p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all"
+              aria-label="Close sidebar"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
 
           <nav className="flex-1 px-4 py-4 space-y-2">
             {menuItems.map((item) => (
