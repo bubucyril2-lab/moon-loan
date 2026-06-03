@@ -28,3 +28,69 @@
     @apply w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all;
   }
 }
+
+/* Full Responsive Mobile Safety Overrides */
+
+/* Make responsive horizontal containers smooth-scrolling with a clean touch feedback styling */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch !important;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(16, 185, 129, 0.3) transparent;
+}
+
+/* Customize thin horizontal scrollbars for beautiful accessibility */
+.overflow-x-auto::-webkit-scrollbar {
+  height: 6px !important;
+}
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: #f1f5f9 !important;
+  border-radius: 99px !important;
+}
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #10b981 !important;
+  border-radius: 99px !important;
+}
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: #059669 !important;
+}
+
+/* Provide physical table scrolling rules on mobile device viewport widths */
+@media (max-width: 768px) {
+  /* Prevent tables from compressing and squashing text readability */
+  .overflow-x-auto table {
+    min-width: 680px !important;
+  }
+
+  /* Automatically present an elegant, subtle indicator tag alerting the user of scrollable fields */
+  .overflow-x-auto::after {
+    content: "↔ Swipe left/right to view full details ↔";
+    display: block;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #047857;
+    background-color: #f0fdf4;
+    padding: 8px;
+    border-top: 1px solid #d1fae5;
+    margin-top: 8px;
+    border-radius: 0 0 12px 12px;
+  }
+
+  /* Safeguard container sizing on small screens for all grids and sections */
+  .grid {
+    max-width: 100% !important;
+  }
+
+  input, select, textarea {
+    max-width: 100% !important;
+  }
+}
+
+/* Safe sizing override for interactive charts */
+.recharts-responsive-container {
+  min-width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+

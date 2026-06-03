@@ -99,12 +99,12 @@ const CustomerDashboard = () => {
       {/* Virtual Card & Balance */}
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 relative group">
-          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl shadow-slate-900/40 min-h-[320px] flex flex-col justify-between border border-white/10">
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-[2.5rem] p-6 sm:p-10 text-white relative overflow-hidden shadow-2xl shadow-slate-900/40 min-h-[300px] flex flex-col justify-between border border-white/10">
             {/* Card Header */}
             <div className="relative z-10 flex justify-between items-start">
               <div>
-                <p className="text-emerald-500 font-black tracking-[0.2em] text-sm mb-1">ECONEST BANK</p>
-                <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Virtual Debit Card</p>
+                <p className="text-emerald-500 font-black tracking-[0.2em] text-xs sm:text-sm mb-1">ECONEST BANK</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-400 uppercase tracking-widest font-bold">Virtual Debit Card</p>
               </div>
               <div className="w-12 h-10 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg relative overflow-hidden shadow-inner">
                 <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)]"></div>
@@ -118,22 +118,22 @@ const CustomerDashboard = () => {
             </div>
 
             {/* Card Number */}
-            <div className="relative z-10 my-8">
-              <p className="text-xs text-slate-500 uppercase tracking-[0.3em] font-bold mb-3 opacity-60">Card Number</p>
-              <p className="font-mono text-3xl md:text-4xl tracking-[0.15em] text-slate-100 drop-shadow-lg">
+            <div className="relative z-10 my-4 sm:my-8">
+              <p className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-[0.3em] font-bold mb-2 opacity-60">Card Number</p>
+              <p className="font-mono text-base xs:text-lg sm:text-3xl md:text-4xl tracking-[0.1em] sm:tracking-[0.15em] text-slate-100 drop-shadow-lg break-all">
                 {account?.accountNumber.replace(/(\d{4})/g, '$1 ').trim()}
               </p>
             </div>
 
             {/* Card Footer */}
-            <div className="relative z-10 flex justify-between items-end">
+            <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
               <div className="space-y-1">
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold opacity-60">Card Holder</p>
-                <p className="text-xl font-bold tracking-wide text-slate-200 uppercase">{user?.fullName}</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-widest font-bold opacity-60">Card Holder</p>
+                <p className="text-sm sm:text-xl font-bold tracking-wide text-slate-200 uppercase">{user?.fullName}</p>
               </div>
-              <div className="text-right">
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold opacity-60 mb-1">Balance</p>
-                <p className="text-3xl font-black text-emerald-400">
+              <div className="text-left sm:text-right w-full sm:w-auto mt-2 sm:mt-0">
+                <p className="text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-widest font-bold opacity-60 mb-1">Balance</p>
+                <p className="text-xl sm:text-3xl font-black text-emerald-400">
                   ${account?.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </p>
               </div>
