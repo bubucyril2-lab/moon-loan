@@ -47,73 +47,98 @@ const GoogleTranslate: React.FC = () => {
                   max-width: 100vw !important;
                   margin: 0 !important;
                   padding: 0 !important;
-                  overflow-x: auto !important;
-                  overflow-y: hidden !important;
+                  overflow-x: hidden !important;
+                  overflow-y: auto !important;
+                  height: 100% !important;
                   -webkit-overflow-scrolling: touch !important;
                   background-color: #ffffff !important;
                 }
                 .goog-te-menu2 {
                   width: 100% !important;
                   max-width: 100vw !important;
-                  height: 100% !important;
+                  height: auto !important;
+                  min-height: 100% !important;
                   box-sizing: border-box !important;
-                  overflow-x: auto !important;
-                  overflow-y: hidden !important;
+                  overflow-x: hidden !important;
+                  overflow-y: auto !important;
                   -webkit-overflow-scrolling: touch !important;
-                  padding: 12px !important;
+                  padding: 16px !important;
                   background-color: #ffffff !important;
                   border: none !important;
                 }
                 .goog-te-menu2 table, .goog-te-menu2 tbody {
                   display: block !important;
-                  width: max-content !important;
-                  max-width: none !important;
+                  width: 100% !important;
+                  max-width: 100% !important;
+                  box-sizing: border-box !important;
                 }
                 .goog-te-menu2 tr {
                   display: flex !important;
-                  flex-direction: row !important;
-                  flex-wrap: nowrap !important;
-                  width: max-content !important;
+                  flex-wrap: wrap !important;
+                  width: 100% !important;
+                  gap: 8px !important;
+                  box-sizing: border-box !important;
                 }
                 .goog-te-menu2 td {
-                  display: inline-block !important;
-                  white-space: nowrap !important;
-                  flex-shrink: 0 !important;
-                  padding: 4px 6px !important;
-                }
-                .goog-te-menu2 a, .goog-te-menu2 a:link, .goog-te-menu2 a:visited {
-                  color: #1e293b !important;
-                  font-size: 14px !important;
-                  font-weight: 500 !important;
-                  text-decoration: none !important;
-                  padding: 8px 14px !important;
-                  border-radius: 8px !important;
-                  background-color: #f1f5f9 !important;
-                  display: inline-block !important;
-                  transition: all 0.2s !important;
-                  margin: 2px !important;
-                  border: 1px solid #e2e8f0 !important;
-                }
-                .goog-te-menu2 a:hover, .goog-te-menu2 a:active {
-                  background-color: #cbd5e1 !important;
-                  color: #0f172a !important;
+                  display: block !important;
+                  flex: 1 1 calc(50% - 8px) !important;
+                  width: calc(50% - 8px) !important;
+                  min-width: calc(50% - 8px) !important;
+                  max-width: calc(50% - 8px) !important;
+                  box-sizing: border-box !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
                 }
                 .goog-te-menu2-item div {
                   padding: 0 !important;
+                  margin: 0 !important;
                 }
                 .goog-te-menu2-item {
                   padding: 0 !important;
+                  margin: 0 !important;
+                  display: block !important;
+                  width: 100% !important;
+                }
+                .goog-te-menu2-item div, .goog-te-menu2-item span {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  background: transparent !important;
+                  border: none !important;
+                }
+                .goog-te-menu2 a, .goog-te-menu2 a:link, .goog-te-menu2 a:visited {
+                  color: #334155 !important;
+                  font-family: inherit !important;
+                  font-size: 14px !important;
+                  font-weight: 500 !important;
+                  text-decoration: none !important;
+                  padding: 12px 8px !important;
+                  border-radius: 8px !important;
+                  background-color: #f8fafc !important;
+                  display: block !important;
+                  transition: all 0.2s ease !important;
+                  margin: 0 !important;
+                  border: 1px solid #e2e8f0 !important;
+                  text-align: center !important;
+                  white-space: nowrap !important;
+                  overflow: hidden !important;
+                  text-overflow: ellipsis !important;
+                  box-sizing: border-box !important;
+                }
+                .goog-te-menu2 a:hover, .goog-te-menu2 a:active {
+                  background-color: #2563eb !important;
+                  color: #ffffff !important;
+                  border-color: #1d4ed8 !important;
                 }
                 ::-webkit-scrollbar {
                   height: 6px !important;
                   width: 6px !important;
                 }
                 ::-webkit-scrollbar-thumb {
-                  background-color: #94a3b8 !important;
+                  background-color: #cbd5e1 !important;
                   border-radius: 9999px !important;
                 }
                 ::-webkit-scrollbar-track {
-                  background-color: #f1f5f9 !important;
+                  background-color: #f8fafc !important;
                 }
               `;
               iframeDoc.head.appendChild(style);
@@ -227,15 +252,15 @@ const GoogleTranslate: React.FC = () => {
             right: 0px !important;
             top: auto !important;
             bottom: 0px !important;
-            height: 180px !important;
+            height: 400px !important;
+            max-height: 60vh !important;
             position: fixed !important;
             box-sizing: border-box !important;
-            border-radius: 16px 16px 0 0 !important;
-            box-shadow: 0 -10px 25px -5px rgb(0 0 0 / 0.1) !important;
+            border-radius: 20px 20px 0 0 !important;
+            box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.15) !important;
             border: none !important;
             border-top: 1px solid #cbd5e1 !important;
-            overflow-x: auto !important;
-            overflow-y: hidden !important;
+            overflow: hidden !important;
             -webkit-overflow-scrolling: touch !important;
             z-index: 999999999 !important;
           }
