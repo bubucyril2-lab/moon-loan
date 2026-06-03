@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Landmark, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { firebaseAuthService } from '../../services/firebaseAuthService';
@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const Login = () => {
   const { user, isLoading: authLoading } = useAuth();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -74,6 +75,16 @@ const Login = () => {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-xl shadow-slate-200/50 sm:rounded-2xl sm:px-10 border border-slate-100">
           <form className="space-y-6" onSubmit={handleSubmit}>
+            {searchParams.get('reason') === 'inactivity' && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-xl flex items-start gap-3 text-sm shadow-sm">
+                <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold">Security Timeout</p>
+                  <p className="text-[12px] opacity-90 mt-0.5">You have been logged out after 5 minutes of inactivity to protect your secure session.</p>
+                </div>
+              </div>
+            )}
+
             {error && (
               <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl flex items-center gap-3 text-sm">
                 <AlertCircle className="h-5 w-5 flex-shrink-0" />
