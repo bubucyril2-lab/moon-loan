@@ -31,6 +31,111 @@ window.googleTranslateElementInit = initGoogleTranslate;
 
 const GoogleTranslate: React.FC = () => {
   useEffect(() => {
+    const injectStyles = () => {
+      try {
+        const iframe = document.querySelector('iframe.goog-te-menu-frame') as HTMLIFrameElement;
+        if (iframe) {
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (iframeDoc) {
+            const existingStyle = iframeDoc.getElementById('custom-mobile-translate-style');
+            if (!existingStyle) {
+              const style = iframeDoc.createElement('style');
+              style.id = 'custom-mobile-translate-style';
+              style.innerHTML = `
+                html, body {
+                  width: 100% !important;
+                  max-width: 100vw !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  overflow-x: auto !important;
+                  overflow-y: hidden !important;
+                  -webkit-overflow-scrolling: touch !important;
+                  background-color: #ffffff !important;
+                }
+                .goog-te-menu2 {
+                  width: 100% !important;
+                  max-width: 100vw !important;
+                  height: 100% !important;
+                  box-sizing: border-box !important;
+                  overflow-x: auto !important;
+                  overflow-y: hidden !important;
+                  -webkit-overflow-scrolling: touch !important;
+                  padding: 12px !important;
+                  background-color: #ffffff !important;
+                  border: none !important;
+                }
+                .goog-te-menu2 table, .goog-te-menu2 tbody {
+                  display: block !important;
+                  width: max-content !important;
+                  max-width: none !important;
+                }
+                .goog-te-menu2 tr {
+                  display: flex !important;
+                  flex-direction: row !important;
+                  flex-wrap: nowrap !important;
+                  width: max-content !important;
+                }
+                .goog-te-menu2 td {
+                  display: inline-block !important;
+                  white-space: nowrap !important;
+                  flex-shrink: 0 !important;
+                  padding: 4px 6px !important;
+                }
+                .goog-te-menu2 a, .goog-te-menu2 a:link, .goog-te-menu2 a:visited {
+                  color: #1e293b !important;
+                  font-size: 14px !important;
+                  font-weight: 500 !important;
+                  text-decoration: none !important;
+                  padding: 8px 14px !important;
+                  border-radius: 8px !important;
+                  background-color: #f1f5f9 !important;
+                  display: inline-block !important;
+                  transition: all 0.2s !important;
+                  margin: 2px !important;
+                  border: 1px solid #e2e8f0 !important;
+                }
+                .goog-te-menu2 a:hover, .goog-te-menu2 a:active {
+                  background-color: #cbd5e1 !important;
+                  color: #0f172a !important;
+                }
+                .goog-te-menu2-item div {
+                  padding: 0 !important;
+                }
+                .goog-te-menu2-item {
+                  padding: 0 !important;
+                }
+                ::-webkit-scrollbar {
+                  height: 6px !important;
+                  width: 6px !important;
+                }
+                ::-webkit-scrollbar-thumb {
+                  background-color: #94a3b8 !important;
+                  border-radius: 9999px !important;
+                }
+                ::-webkit-scrollbar-track {
+                  background-color: #f1f5f9 !important;
+                }
+              `;
+              iframeDoc.head.appendChild(style);
+            }
+          }
+        }
+      } catch (e) {
+        console.debug('Failed same-origin iframe style injection context', e);
+      }
+    };
+
+    injectStyles();
+    const intervalId = setInterval(injectStyles, 400);
+    document.addEventListener('click', injectStyles);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('click', injectStyles);
+    };
+  }, []);
+
+  useEffect(() => {
     const addScript = () => {
       if (document.querySelector('script[src*="translate.google.com"]')) {
         // If script exists but google is not ready, it will call the global init when ready
@@ -120,9 +225,19 @@ const GoogleTranslate: React.FC = () => {
             max-width: 100vw !important;
             left: 0px !important;
             right: 0px !important;
+            top: auto !important;
+            bottom: 0px !important;
+            height: 180px !important;
+            position: fixed !important;
             box-sizing: border-box !important;
-            overflow: auto !important;
+            border-radius: 16px 16px 0 0 !important;
+            box-shadow: 0 -10px 25px -5px rgb(0 0 0 / 0.1) !important;
+            border: none !important;
+            border-top: 1px solid #cbd5e1 !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
             -webkit-overflow-scrolling: touch !important;
+            z-index: 999999999 !important;
           }
         }
       `}</style>
