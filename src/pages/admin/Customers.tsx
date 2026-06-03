@@ -756,7 +756,7 @@ const AdminCustomers = () => {
                 <div className="md:col-span-2 space-y-8">
                   <div>
                     <h4 className="font-bold text-slate-900 mb-4">Recent Transactions</h4>
-                    <div className="bg-slate-50 rounded-2xl border border-slate-100 overflow-x-auto">
+                    <div className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
                       <table className="w-full text-left text-sm">
                         <thead className="bg-slate-100/50">
                           <tr>

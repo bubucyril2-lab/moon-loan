@@ -1,6 +1,5 @@
 {
   "name": "ECONEST BANK",
   "description": "A complete full-stack digital banking platform with public interface, customer dashboard, and admin management panel.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "requestFramePermissions": []
 }
