@@ -109,10 +109,21 @@ const GoogleTranslate: React.FC = () => {
         body {
           top: 0 !important;
         }
-        .goog-te-menu-frame {
+        iframe.goog-te-menu-frame, .goog-te-menu-frame {
           box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
           border: 1px solid #e2e8f0 !important;
           border-radius: 12px !important;
+        }
+        @media (max-width: 768px) {
+          iframe.goog-te-menu-frame, .goog-te-menu-frame {
+            width: 100% !important;
+            max-width: 100vw !important;
+            left: 0px !important;
+            right: 0px !important;
+            box-sizing: border-box !important;
+            overflow: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
         }
       `}</style>
     </div>
