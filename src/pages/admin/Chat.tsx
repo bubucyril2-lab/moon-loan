@@ -55,7 +55,7 @@ const AdminChat = () => {
   );
 
   return (
-    <div className="h-[calc(100vh-12rem)] flex flex-col md:flex-row gap-4 md:gap-8">
+    <div className="h-[calc(100vh-15.5rem)] md:h-[calc(100vh-12rem)] flex flex-col md:flex-row gap-4 md:gap-8">
       {/* Customer List */}
       <div className={`${selectedCustomer ? 'hidden md:flex' : 'flex'} w-full md:w-80 bg-white border border-slate-200 rounded-3xl flex-col overflow-hidden shadow-sm`}>
         <div className="p-6 border-b border-slate-100">

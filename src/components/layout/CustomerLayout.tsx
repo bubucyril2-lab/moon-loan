@@ -65,14 +65,14 @@ const CustomerLayout = () => {
       {/* Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[55] lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-400 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
+        "fixed inset-y-0 left-0 z-[60] w-64 bg-slate-900 text-slate-400 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
@@ -144,10 +144,11 @@ const CustomerLayout = () => {
             <NotificationCenter />
             <button
               onClick={handleLogout}
-              className="hidden sm:flex items-center gap-2 px-3 py-2 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all font-medium"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all font-medium text-xs sm:text-sm"
+              title="Logout"
             >
-              <LogOut className="h-4 w-4" />
-              <span>Logout</span>
+              <LogOut className="h-4 w-4 text-rose-500 sm:text-slate-500" />
+              <span className="hidden sm:inline">Logout</span>
             </button>
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-sm font-bold text-slate-900">{user?.fullName}</span>

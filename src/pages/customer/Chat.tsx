@@ -35,7 +35,7 @@ const CustomerChat = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto h-[calc(100vh-12rem)] flex flex-col">
+    <div className="max-w-4xl mx-auto h-[calc(100vh-15.5rem)] sm:h-[calc(100vh-12rem)] flex flex-col">
       <div className="bg-white border border-slate-200 rounded-t-3xl p-6 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-4">
           <button 
