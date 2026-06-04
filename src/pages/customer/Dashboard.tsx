@@ -747,53 +747,146 @@ const CustomerDashboard = () => {
       {/* Virtual Debit Card Interface */}
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 relative group">
-          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-[2.5rem] p-6 sm:p-10 text-white relative overflow-hidden shadow-2xl shadow-slate-900/40 min-h-[300px] flex flex-col justify-between border border-white/10">
-            {/* Card Header Label */}
+          <div className="bg-gradient-to-tr from-[#021c16] via-[#092d24] to-[#113a30] rounded-[2rem] p-6 sm:p-8 text-white relative overflow-hidden shadow-2xl shadow-emerald-950/45 aspect-[1.586/1] w-full max-w-2xl mx-auto flex flex-col justify-between border border-emerald-500/20 ring-1 ring-emerald-500/10 select-none hover:shadow-emerald-950/60 transition-all duration-500">
+            {/* Fine laser-etched decorative concentric vector ripples for authentic security styling */}
+            <div className="absolute inset-0 opacity-[0.06] pointer-events-none mix-blend-overlay">
+              <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <circle cx="20" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="0.5" />
+                <circle cx="20" cy="50" r="30" fill="none" stroke="currentColor" strokeWidth="0.3" />
+                <circle cx="20" cy="50" r="20" fill="none" stroke="currentColor" strokeWidth="0.2" />
+                <circle cx="80" cy="50" r="35" fill="none" stroke="currentColor" strokeWidth="0.5" />
+                <circle cx="80" cy="50" r="25" fill="none" stroke="currentColor" strokeWidth="0.3" />
+                <circle cx="50" cy="50" r="60" fill="none" stroke="currentColor" strokeWidth="0.2" />
+                <path d="M0,50 Q25,30 50,50 T100,50" fill="none" stroke="currentColor" strokeWidth="0.4" />
+                <path d="M0,45 Q25,25 50,45 T100,45" fill="none" stroke="currentColor" strokeWidth="0.2" />
+              </svg>
+            </div>
+
+            {/* Futuristic physical Card Edge highlight and gloss sheen */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none rounded-[2rem]"></div>
+            <div className="absolute inset-[1px] border border-white/5 rounded-[1.95rem] pointer-events-none"></div>
+
+            {/* Card Header Panel */}
             <div className="relative z-10 flex justify-between items-start">
-              <div>
-                <p className="text-emerald-400 font-black tracking-[0.2em] text-xs sm:text-xs mb-1">ECONEST SECURE LEDGER</p>
-                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400">Virtual Omnidirectional Debit Card</p>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-md shadow-emerald-950/50">
+                    <Send className="h-4 w-4 text-white rotate-45 transform" />
+                  </div>
+                  <div>
+                    <span className="font-sans font-black tracking-[0.2em] text-sm sm:text-base text-white">ECONEST</span>
+                    <span className="text-[9px] font-bold text-emerald-400 tracking-[0.05em] ml-1.5 uppercase">LEDGER</span>
+                  </div>
+                </div>
+                <p className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">Virtual Sovereign World Asset Card</p>
               </div>
-              <div className="w-12 h-10 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg relative overflow-hidden shadow-inner">
-                <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)]"></div>
-                <div className="grid grid-cols-2 gap-px h-full p-1 opacity-40">
-                  <div className="border-r border-b border-black/20"></div>
-                  <div className="border-b border-black/20"></div>
-                  <div className="border-r border-black/20"></div>
-                  <div></div>
+
+              {/* Secure holographic label */}
+              <div className="flex items-center gap-3">
+                <div className="hidden sm:block text-right pr-1">
+                  <p className="text-[8px] font-black text-amber-400/90 tracking-widest uppercase">WORLD ELITE</p>
+                  <p className="text-[7px] font-bold text-slate-400 uppercase tracking-wider">Debit Custody</p>
+                </div>
+                <div className="relative w-10 h-10 rounded-full bg-gradient-to-tr from-rose-500/25 via-teal-400/35 to-amber-400/25 flex items-center justify-center border border-white/15 overflow-hidden shadow-inner backdrop-blur-sm group-hover:scale-105 transition-all">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-indigo-500/20 via-sky-300/30 to-amber-300/25 font-mono text-[7px] flex items-center justify-center font-black text-white/50 select-none">
+                    SECURE
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Card ID Line */}
-            <div className="relative z-10 my-4 sm:my-8">
-              <p className="text-[10px] text-slate-500 uppercase tracking-[0.3em] font-bold mb-2 opacity-60">Card Ledger Line</p>
-              <p className="font-mono text-base xs:text-lg sm:text-3xl tracking-[0.1em] sm:tracking-[0.15em] text-slate-100 drop-shadow-md break-all">
-                {account?.accountNumber.replace(/(\d{4})/g, '$1 ').trim()}
-              </p>
+            {/* Card EMV Micro-Chip & Contactless waves */}
+            <div className="relative z-10 flex items-center justify-between mt-3 sm:mt-6">
+              {/* Gold Plated EMV Chip */}
+              <div className="w-[52px] h-[40px] rounded-lg bg-gradient-to-br from-amber-200 via-yellow-400 to-amber-300 relative border border-amber-600/40 overflow-hidden shadow-lg shadow-black/20">
+                {/* Authentic laser layout inside chip */}
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[0.5px] bg-yellow-900/40"></div>
+                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[0.5px] bg-yellow-900/40"></div>
+                <div className="absolute inset-[6px] border border-yellow-800/20 rounded-[2px]"></div>
+                <div className="absolute left-[13px] top-0 bottom-0 w-[0.5px] bg-yellow-900/40"></div>
+                <div className="absolute right-[13px] top-0 bottom-0 w-[0.5px] bg-yellow-900/40"></div>
+                {/* Inner micro solder points */}
+                <div className="absolute left-[6px] top-1/2 -translate-y-1/2 w-3 h-2.5 bg-amber-400/20 rounded-sm"></div>
+                <div className="absolute right-[6px] top-1/2 -translate-y-1/2 w-3 h-2.5 bg-amber-400/20 rounded-sm"></div>
+              </div>
+
+              {/* Contactless Radio Wave Signal */}
+              <div className="flex items-center gap-1 opacity-70">
+                <div className="w-1.5 h-1.5 bg-slate-300 rounded-full"></div>
+                <div className="w-[3px] h-3 border-r-2 border-slate-300 rounded-full"></div>
+                <div className="w-[3px] h-4.5 border-r-2 border-slate-300 rounded-full"></div>
+                <div className="w-[3px] h-6 border-r-2 border-slate-300 rounded-full"></div>
+              </div>
             </div>
 
-            {/* Card Bottom Panel */}
-            <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-              <div className="space-y-1">
-                <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold opacity-60">Gold Custodian</p>
-                <p className="text-sm sm:text-lg font-bold tracking-wide text-slate-200 uppercase">{user?.fullName}</p>
-              </div>
-              <div className="text-left sm:text-right w-full sm:w-auto">
-                <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold opacity-60 mb-1">Available Clearing Book Value</p>
-                <p className="text-xl sm:text-3xl font-black text-emerald-400">
-                  ${account?.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs text-slate-400 font-sans font-normal">USD</span>
+            {/* Card ID Line - Styled with embossed tactile font feel */}
+            <div className="relative z-10 mt-4">
+              <p className="text-[7px] sm:text-[8px] text-slate-500 uppercase tracking-[0.25em] font-black pb-0.5 opacity-80">Primary Security Account Number</p>
+              <div className="flex items-center gap-4">
+                <p 
+                  className="font-mono text-lg sm:text-2xl md:text-3xl tracking-[0.12em] text-white select-all drop-shadow-[0_2px_1px_rgba(0,0,0,0.85)] font-bold"
+                  style={{ textShadow: "0px 1.5px 1px rgba(0, 0, 0, 0.95), 0px -0.5px 0.5px rgba(255,255,255,0.15)" }}
+                >
+                  {((account?.accountNumber || "8175861144219358").padEnd(16, "0")).replace(/(\d{4})/g, '$1 ').trim()}
                 </p>
               </div>
             </div>
 
-            {/* Floating visual watermark designs */}
-            <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none">
-              <ShieldCheck className="h-48 w-48" />
+            {/* Expiry Date Info Section */}
+            <div className="relative z-10 flex items-center gap-6 mt-1 sm:mt-2">
+              <div className="flex items-center gap-1.5">
+                <div className="text-[5px] sm:text-[6px] font-black text-slate-500 uppercase leading-[7px] tracking-wider text-right">
+                  VALID<br />FROM
+                </div>
+                <span className="font-mono text-xs text-slate-300 font-bold tracking-widest">06 / 26</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="text-[5px] sm:text-[6px] font-black text-slate-500 uppercase leading-[7px] tracking-wider text-right">
+                  GOOD<br />THRU
+                </div>
+                <span 
+                  className="font-mono text-xs text-white font-bold tracking-widest drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]"
+                  style={{ textShadow: "0px 1px 1px rgba(0, 0, 0, 0.95)" }}
+                >
+                  08 / 31
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[6px] font-black text-slate-500 tracking-wider uppercase">CVV</span>
+                <span className="font-mono text-[10px] text-slate-400 font-bold bg-slate-950/40 px-1.5 py-0.5 rounded border border-white/5">***</span>
+              </div>
             </div>
-            <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-emerald-500/10 blur-[100px] rounded-full pointer-events-none"></div>
+
+            {/* Card Bottom Panel with Holder Name and Available Balance */}
+            <div className="relative z-10 flex justify-between items-end mt-4 pt-2 border-t border-emerald-500/10 gap-4">
+              <div className="space-y-0.5">
+                <p className="text-[7px] sm:text-[8px] text-slate-500 uppercase tracking-widest font-black opacity-80">Primary Account Custodian</p>
+                <p 
+                  className="text-xs sm:text-base font-bold tracking-wider text-emerald-100 uppercase drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]"
+                  style={{ textShadow: "0px 1.2px 1px rgba(0, 0, 0, 0.95)" }}
+                >
+                  {user?.fullName}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[7px] sm:text-[8px] text-slate-500 uppercase tracking-widest font-black opacity-80 mb-0.5">Book Balance Level</p>
+                <div className="flex items-baseline justify-end gap-1 font-mono">
+                  <span className="text-xs font-bold text-emerald-400">$</span>
+                  <span className="text-base sm:text-2xl font-black text-emerald-400 tracking-tight">
+                    {account?.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-[8px] text-slate-400 font-sans font-black ml-0.5 uppercase">USD</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Overlay watermark details */}
+            <div className="absolute top-1/2 left-1/3 p-12 opacity-[0.015] pointer-events-none transform -translate-y-1/2">
+              <ShieldCheck className="h-60 w-60" />
+            </div>
+            <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none"></div>
           </div>
-          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-[2.6rem] blur opacity-0 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 pointer-events-none"></div>
+          <div className="absolute -inset-1.5 bg-gradient-to-r from-emerald-500/20 via-teal-500/10 to-transparent rounded-[2.1rem] blur-md opacity-0 group-hover:opacity-100 transition duration-1000 group-hover:duration-300 pointer-events-none"></div>
         </div>
 
         {/* Quick Utilities Hub */}
