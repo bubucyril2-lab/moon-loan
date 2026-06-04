@@ -747,7 +747,7 @@ const CustomerDashboard = () => {
       {/* Virtual Debit Card Interface */}
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 relative group">
-          <div className="bg-gradient-to-tr from-[#021c16] via-[#092d24] to-[#113a30] rounded-[2rem] p-6 sm:p-8 text-white relative overflow-hidden shadow-2xl shadow-emerald-950/45 aspect-[1.586/1] w-full max-w-2xl mx-auto flex flex-col justify-between border border-emerald-500/20 ring-1 ring-emerald-500/10 select-none hover:shadow-emerald-950/60 transition-all duration-500">
+          <div className="bg-gradient-to-tr from-[#021c16] via-[#092d24] to-[#113a30] rounded-[2rem] p-5 sm:p-8 text-white relative overflow-hidden shadow-2xl shadow-emerald-950/45 aspect-auto sm:aspect-[1.586/1] min-h-[300px] sm:min-h-0 w-full max-w-2xl mx-auto flex flex-col justify-between border border-emerald-500/20 ring-1 ring-emerald-500/10 select-none hover:shadow-emerald-950/60 transition-all duration-500">
             {/* Fine laser-etched decorative concentric vector ripples for authentic security styling */}
             <div className="absolute inset-0 opacity-[0.06] pointer-events-none mix-blend-overlay">
               <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
