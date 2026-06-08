@@ -4,6 +4,8 @@ import { Shield, Zap, Globe, ArrowRight, CheckCircle2, Landmark } from 'lucide-r
 import PublicNavbar from '../../components/layout/PublicNavbar';
 import { motion } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
+// @ts-ignore
+import moneyCountingBg from '../../assets/images/money_counting_bg_1780887887113.png';
 
 const Home = () => {
   return (
@@ -15,7 +17,7 @@ const Home = () => {
         {/* Background Image with Overlay */}
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1920&q=80" 
+            src={moneyCountingBg} 
             alt="Hero Background" 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
