@@ -80,7 +80,7 @@ const Login = () => {
                 <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-semibold">Security Timeout</p>
-                  <p className="text-[12px] opacity-90 mt-0.5">You have been logged out after 5 minutes of inactivity to protect your secure session.</p>
+                  <p className="text-[12px] opacity-90 mt-0.5">You have been logged out after 30 minutes of inactivity to protect your secure session.</p>
                 </div>
               </div>
             )}

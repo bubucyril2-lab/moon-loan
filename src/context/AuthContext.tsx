@@ -25,7 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const lastActive = localStorage.getItem('lastActive');
         if (lastActive) {
           const timeSinceLastActive = Date.now() - Number(lastActive);
-          if (timeSinceLastActive >= 5 * 60 * 1000) {
+          if (timeSinceLastActive >= 30 * 60 * 1000) {
             await signOut(auth);
             setUser(null);
             setToken(null);
@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  // Set up active listening loops to track and log user out after 5 minutes of total inactivity
+  // Set up active listening loops to track and log user out after 30 minutes of total inactivity
   useEffect(() => {
     if (!user) {
       localStorage.removeItem('lastActive');
@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const lastActive = localStorage.getItem('lastActive');
       if (lastActive) {
         const timeSinceLastActive = Date.now() - Number(lastActive);
-        if (timeSinceLastActive >= 5 * 60 * 1000) {
+        if (timeSinceLastActive >= 30 * 60 * 1000) {
           clearInterval(checkInterval);
           console.log('Logging out due to inactivity');
           logout().then(() => {
