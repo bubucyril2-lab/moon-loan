@@ -1,31 +1,40 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Shield, Zap, Globe, ArrowRight, CheckCircle2, Landmark } from 'lucide-react';
+import { Shield, Zap, Globe, ArrowRight, CheckCircle2, Landmark, Wifi, RotateCw, HelpCircle, CreditCard } from 'lucide-react';
 import PublicNavbar from '../../components/layout/PublicNavbar';
 import { motion } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
 // @ts-ignore
-import moneyCountingBg from '../../assets/images/money_counting_bg_1780887887113.png';
+import bankHqBg from '../../assets/images/econest_bank_hq_1782508914035.jpg';
 
 const Home = () => {
+  const [flippedCards, setFlippedCards] = useState<Record<number, boolean>>({});
+
+  const toggleCard = (index: number) => {
+    setFlippedCards(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
   return (
     <div className="min-h-screen">
       <PublicNavbar />
       
       {/* Hero Section */}
-      <section className="relative min-h-[80vh] flex items-center overflow-hidden">
+      <section className="relative min-h-[85vh] flex items-end overflow-hidden">
         {/* Background Image with Overlay */}
         <div className="absolute inset-0 z-0">
           <img 
-            src={moneyCountingBg} 
+            src={bankHqBg} 
             alt="Hero Background" 
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-center"
             referrerPolicy="no-referrer"
           />
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[1px]"></div>
+          {/* Multi-layered gradient overlay: darker on the bottom to protect text contrast, lighter on top to reveal the gorgeous bank signage */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/50 to-slate-900/25 backdrop-blur-[0.5px]"></div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-48 pb-16 sm:pb-20 w-full">
           <div className="max-w-3xl">
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
@@ -223,32 +232,208 @@ const Home = () => {
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="py-24">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-slate-900 mb-4">Frequently Asked Questions</h2>
-            <p className="text-slate-600">Find answers to common questions about our services.</p>
+      {/* FAQ Section with Interactive 3D ATM Cards */}
+      <section className="py-24 bg-slate-50/50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <span className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 tracking-wider uppercase inline-block mb-3">
+              Interactive Support
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mb-4">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-slate-600 max-w-xl mx-auto text-sm sm:text-base">
+              Find answers to common questions styled as our exclusive premium tier card collection. 
+              <span className="block mt-1 font-medium text-emerald-600">Click any card to flip and reveal the details!</span>
+            </p>
+          </div>
+
+          {/* Interactive controls */}
+          <div className="flex justify-center mb-12">
+            <button
+              onClick={() => {
+                const someFlipped = [0, 1, 2, 3].some(idx => flippedCards[idx]);
+                const nextState = !someFlipped;
+                setFlippedCards({
+                  0: nextState,
+                  1: nextState,
+                  2: nextState,
+                  3: nextState,
+                });
+              }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-emerald-500 hover:text-emerald-600 font-semibold text-sm transition-all text-slate-700 active:scale-95"
+            >
+              <RotateCw className="h-4 w-4 text-emerald-500" />
+              <span>
+                {[0, 1, 2, 3].some(idx => flippedCards[idx]) ? 'Flip All Front' : 'Flip All Back'}
+              </span>
+            </button>
           </div>
           
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10">
             {[
-              { q: 'How do I open an account?', a: 'You can open an account by clicking the "Get Started" button and filling out our simple registration form. You\'ll need to provide some basic information and verify your identity.' },
-              { q: 'What are the loan requirements?', a: 'To apply for a loan, you must be a registered member with an active account. Requirements vary based on the loan amount and plan chosen.' },
-              { q: 'Is my money safe with ECONEST BANK?', a: 'Yes, we use industry-standard encryption and security protocols to protect your assets and personal information. We are a registered financial institution.' },
-              { q: 'How long does loan approval take?', a: 'Our automated system processes applications quickly. Most loans are reviewed and approved within 24 hours.' }
-            ].map((faq, i) => (
-              <details key={i} className="group bg-slate-50 rounded-2xl border border-slate-100 p-6 cursor-pointer">
-                <summary className="flex items-center justify-between font-bold text-slate-900 list-none">
-                  {faq.q}
-                  <span className="transition-transform group-open:rotate-180">
-                    <ArrowRight className="h-5 w-5 rotate-90" />
-                  </span>
-                </summary>
-                <p className="mt-4 text-slate-600 leading-relaxed">
-                  {faq.a}
-                </p>
-              </details>
+              {
+                q: 'How do I open an account?',
+                a: "You can open an account by clicking the 'Get Started' button and filling out our simple registration form. You'll need to provide some basic information and verify your identity.",
+                type: 'Platinum Access',
+                bg: 'from-[#022c22] via-[#064e3b] to-[#059669]',
+                border: 'border-emerald-500/30',
+                network: 'mastercard',
+                cvv: '942'
+              },
+              {
+                q: 'What are the loan requirements?',
+                a: 'To apply for a loan, you must be a registered member with an active account. Requirements vary based on the loan amount and plan chosen.',
+                type: 'World Elite Gold',
+                bg: 'from-[#451a03] via-[#78350f] to-[#d97706]',
+                border: 'border-amber-500/30',
+                network: 'visa',
+                cvv: '581'
+              },
+              {
+                q: 'Is my money safe with ECONEST BANK?',
+                a: 'Yes, we use industry-standard encryption and security protocols to protect your assets and personal information. We are a registered financial institution.',
+                type: 'Infinite Sapphire',
+                bg: 'from-[#172554] via-[#1e3a8a] to-[#2563eb]',
+                border: 'border-blue-500/30',
+                network: 'unionpay',
+                cvv: '702'
+              },
+              {
+                q: 'How long does loan approval take?',
+                a: 'Our automated system processes applications quickly. Most loans are reviewed and approved within 24 hours.',
+                type: 'Signature Ruby',
+                bg: 'from-[#4c0519] via-[#881337] to-[#db2777]',
+                border: 'border-rose-500/30',
+                network: 'visa',
+                cvv: '139'
+              }
+            ].map((card, i) => (
+              <div 
+                key={i} 
+                className="h-[270px] w-full cursor-pointer select-none"
+                style={{ perspective: '1000px' }}
+                onClick={() => toggleCard(i)}
+              >
+                <div 
+                  className="relative w-full h-full duration-700 transition-all shadow-xl rounded-[2rem]"
+                  style={{ 
+                    transformStyle: 'preserve-3d',
+                    transform: flippedCards[i] ? 'rotateY(180deg)' : 'rotateY(0deg)'
+                  }}
+                >
+                  {/* FRONT SIDE */}
+                  <div 
+                    className={`absolute inset-0 w-full h-full rounded-[2rem] p-6 sm:p-7 bg-gradient-to-tr ${card.bg} border ${card.border} flex flex-col justify-between overflow-hidden`}
+                    style={{ backfaceVisibility: 'hidden' }}
+                  >
+                    {/* Decorative Hologram Foil Pattern */}
+                    <div className="absolute inset-0 opacity-[0.07] pointer-events-none mix-blend-overlay bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+                    <div className="absolute -right-16 -bottom-16 w-48 h-48 rounded-full bg-white/[0.03] blur-3xl pointer-events-none"></div>
+
+                    {/* Card Header */}
+                    <div className="flex justify-between items-start z-10">
+                      <div className="flex items-center gap-1.5">
+                        <Landmark className="h-5 w-5 text-white/95" />
+                        <span className="font-bold tracking-wider text-xs sm:text-sm text-white">ECONEST BANK</span>
+                      </div>
+                      <span className="text-[9px] sm:text-[10px] font-mono tracking-widest text-white/70 font-semibold uppercase">{card.type}</span>
+                    </div>
+
+                    {/* Chip & Contactless Signal */}
+                    <div className="flex items-center justify-between mt-3 z-10">
+                      {/* Premium Gold EMV Chip */}
+                      <div className="w-11 h-8 sm:w-12 sm:h-9 bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 rounded-lg shadow-md flex flex-col justify-between p-1.5 border border-amber-300/30">
+                        <div className="border border-amber-700/20 rounded h-full w-full flex flex-col justify-between">
+                          <div className="border-b border-amber-700/20 h-1/2"></div>
+                          <div className="flex justify-between h-1/2">
+                            <div className="border-r border-amber-700/20 w-1/3"></div>
+                            <div className="border-r border-amber-700/20 w-1/3"></div>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Wi-Fi Contactless Symbol */}
+                      <Wifi className="h-4 w-4 sm:h-5 sm:w-5 text-white/50 rotate-90" />
+                    </div>
+
+                    {/* Cardholder Question Placement */}
+                    <div className="my-2.5 z-10 flex-1 flex flex-col justify-center">
+                      <p className="text-[8px] sm:text-[9px] font-mono text-white/40 tracking-widest uppercase mb-1">Frequently Asked Question</p>
+                      <p className="text-base sm:text-lg font-bold text-white tracking-wide leading-snug drop-shadow-sm line-clamp-2">
+                        {card.q}
+                      </p>
+                    </div>
+
+                    {/* Card Footer */}
+                    <div className="flex justify-between items-end z-10 pt-2 border-t border-white/15">
+                      <div>
+                        <p className="text-[8px] font-mono text-white/40 tracking-widest uppercase">Click Card To Flip</p>
+                        <span className="text-xs sm:text-sm font-mono text-white/80 tracking-widest mt-0.5 block">•••• •••• •••• 000{i + 1}</span>
+                      </div>
+                      
+                      {/* Card Network Symbol */}
+                      <div className="flex items-center">
+                        {card.network === 'mastercard' && (
+                          <div className="flex -space-x-2.5">
+                            <div className="w-6 h-6 rounded-full bg-rose-500 opacity-90"></div>
+                            <div className="w-6 h-6 rounded-full bg-amber-500 opacity-90"></div>
+                          </div>
+                        )}
+                        {card.network === 'visa' && (
+                          <span className="text-sm sm:text-base font-extrabold italic text-white/90 font-sans tracking-tight">Visa</span>
+                        )}
+                        {card.network === 'unionpay' && (
+                          <div className="flex items-center gap-1 bg-white/15 px-1.5 py-0.5 rounded border border-white/10">
+                            <div className="w-1.5 h-3 bg-red-500 rounded-sm"></div>
+                            <div className="w-1.5 h-3 bg-blue-500 rounded-sm"></div>
+                            <div className="w-1.5 h-3 bg-emerald-500 rounded-sm"></div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* BACK SIDE */}
+                  <div 
+                    className={`absolute inset-0 w-full h-full rounded-[2rem] bg-gradient-to-tr ${card.bg} border ${card.border} flex flex-col justify-between overflow-hidden`}
+                    style={{ 
+                      backfaceVisibility: 'hidden',
+                      transform: 'rotateY(180deg)'
+                    }}
+                  >
+                    {/* Background Texture overlay */}
+                    <div className="absolute inset-0 opacity-[0.04] pointer-events-none mix-blend-overlay bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+
+                    {/* Magnetic Stripe */}
+                    <div className="w-full h-9 sm:h-11 bg-slate-950 mt-5 opacity-95"></div>
+
+                    {/* Signature Panel containing Answer */}
+                    <div className="px-5 sm:px-6 mt-3 flex-1 flex flex-col justify-center">
+                      <div className="flex justify-between items-center mb-1 px-1">
+                        <span className="text-[8px] font-mono text-white/50 tracking-widest uppercase">Authorized Signature / Response</span>
+                        <span className="text-[8px] font-mono text-white/50 tracking-widest uppercase">CVV: {card.cvv}</span>
+                      </div>
+                      
+                      {/* High-contrast response box styled as premium signature area */}
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4 shadow-inner relative overflow-hidden min-h-[90px] sm:min-h-[105px] flex items-center">
+                        <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[repeating-linear-gradient(45deg,#000,#000_10px,transparent_10px,transparent_20px)]"></div>
+                        <p className="text-xs sm:text-sm text-slate-800 font-semibold leading-relaxed font-sans relative z-10">
+                          {card.a}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Back side footer */}
+                    <div className="p-5 sm:p-6 pt-0 flex justify-between items-center text-white/40">
+                      <span className="text-[8px] font-mono tracking-wider">ECONEST BANK CUSTOMER SUPPORT & SECURE LOGOUT</span>
+                      <div className="flex items-center gap-1.5 text-[8px] font-mono hover:text-white/75 transition-colors">
+                        <RotateCw className="h-3 w-3 animate-spin-slow" />
+                        <span>Tap to flip</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         </div>

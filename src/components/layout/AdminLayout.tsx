@@ -63,7 +63,7 @@ const AdminLayout = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-slate-50">
       {/* Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
