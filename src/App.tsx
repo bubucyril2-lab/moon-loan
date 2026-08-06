@@ -11,7 +11,6 @@ import Contact from './pages/public/Contact';
 import Login from './pages/public/Login';
 import Register from './pages/public/Register';
 import ForgotPassword from './pages/public/ForgotPassword';
-import ServiceUnavailable from './pages/public/ServiceUnavailable';
 
 // Dashboard Layouts
 import CustomerLayout from './components/layout/CustomerLayout';
@@ -70,39 +69,6 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 export default function App() {
-  const [isMaintenance, setIsMaintenance] = React.useState<boolean | null>(null);
-
-  React.useEffect(() => {
-    const checkMaintenance = async () => {
-      try {
-        const res = await fetch('/api/maintenance/status');
-        const data = await res.json();
-        setIsMaintenance(data.maintenance);
-      } catch (e) {
-        // If API fails or returns 503, default to maintenance mode true
-        setIsMaintenance(true);
-      }
-    };
-    checkMaintenance();
-  }, []);
-
-  const toggleMaintenanceMode = async () => {
-    try {
-      const res = await fetch('/api/maintenance/toggle', { method: 'POST' });
-      const data = await res.json();
-      setIsMaintenance(data.maintenance);
-      window.location.reload();
-    } catch (e) {
-      setIsMaintenance(prev => !prev);
-    }
-  };
-
-  if (isMaintenance === true && window.location.pathname !== '/503-override') {
-    return (
-      <ServiceUnavailable onToggleMaintenance={toggleMaintenanceMode} />
-    );
-  }
-
   return (
     <ErrorBoundary>
       <AuthProvider>
@@ -117,7 +83,6 @@ export default function App() {
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
             <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
-            <Route path="/503" element={<ServiceUnavailable onToggleMaintenance={toggleMaintenanceMode} />} />
 
             {/* Customer Routes */}
             <Route path="/dashboard" element={
