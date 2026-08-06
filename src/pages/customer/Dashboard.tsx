@@ -57,8 +57,6 @@ import {
   Cell
 } from 'recharts';
 
-import TradingChart from '../../components/TradingChart';
-
 interface LivePriceHistory {
   [key: string]: number[];
 }
@@ -127,9 +125,6 @@ const CustomerDashboard = () => {
   const [account, setAccount] = useState<Account | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Surface Drag & Scroll Lock State
-  const [isChartLocked, setIsChartLocked] = useState(true);
 
   // Live Card Style index persisted state
   const [activeCardIndex, setActiveCardIndex] = useState(() => {
@@ -1143,8 +1138,8 @@ const CustomerDashboard = () => {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 pb-4 border-b border-slate-150">
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 uppercase border border-rose-100">
-                🔴 LIVE ARBITRAGE TERMINAL
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 uppercase border border-emerald-100">
+                ⚡ INSTANT LIQUIDITY DESK
               </span>
             </div>
             <h3 className="text-xl font-black text-slate-900 tracking-tight mt-1 flex items-center gap-2">
@@ -1152,84 +1147,39 @@ const CustomerDashboard = () => {
               Crypto & Precious Metals Brokerage
             </h3>
             <p className="text-xs text-slate-500 font-medium uppercase mt-1">
-              Analyze markets via TradingView advanced charts, toggle dragging surface to lock/unlock scroll protection, execute instant trades
+              Instant order execution desk & portfolio positions settlement
             </p>
-          </div>
-          
-          {/* Surface Drag Control Toggle */}
-          <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl w-fit self-start lg:self-auto">
-            <span className="text-xs font-bold text-slate-500 px-2 uppercase">Chart Interactivity:</span>
-            <button 
-              onClick={() => {
-                setIsChartLocked(true);
-                toast.success("Page scroll mode active. Dragging blocked on chart surface.");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all ${isChartLocked ? 'bg-slate-900 text-white shadow-md' : 'text-slate-600 hover:text-slate-900 bg-transparent'}`}
-            >
-              <Lock className="h-3.5 w-3.5" />
-              Easy Scroll (Locked)
-            </button>
-            <button 
-              onClick={() => {
-                setIsChartLocked(false);
-                toast.success("Interactive mode active. Dragging enabled inside chart surface.");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all ${!isChartLocked ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:text-slate-900 bg-transparent'}`}
-            >
-              <Unlock className="h-3.5 w-3.5" />
-              Free Drag
-            </button>
           </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8 items-start">
-          
-          {/* Chart Workspace (Locked or Unlocked for Drag Interaction) */}
+          {/* Asset Portfolio Position Holdings Box */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="relative h-[380px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-inner">
-              
-              {/* Overlay Indicator if Scroll Lock is Active */}
-              {isChartLocked && (
-                <div className="absolute inset-0 bg-transparent z-[20] pointer-events-auto cursor-default flex items-center justify-center">
-                  {/* Subtle, smart visual alert to educate users */}
-                  <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] font-black tracking-wider uppercase text-slate-100 border border-white/10 shadow-lg flex items-center gap-1.5">
-                    <Lock className="h-3 w-3 text-emerald-400" />
-                    <span>Scroll Lock Active (Drag Prevented)</span>
-                  </div>
-                </div>
-              )}
-              
-              <div className={`w-full h-[410px] ${isChartLocked ? 'pointer-events-none opacity-90' : 'pointer-events-auto'}`}>
-                <TradingChart />
-              </div>
-            </div>
-
-            {/* Asset Portfolio Position Holdings Box */}
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/60 space-y-3">
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200/60 space-y-4">
               <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest flex items-center gap-1.5">
                 <Coins className="h-4 w-4 text-emerald-600" />
                 Your Settled Investment Positions
               </h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-1">
-                <div className="bg-white p-3 rounded-xl border border-slate-150">
+              <div className="grid grid-cols-2 md:grid-cols-2 gap-4 pt-1">
+                <div className="bg-white p-4 rounded-xl border border-slate-150 shadow-sm">
                   <p className="text-[10px] font-black text-slate-400 uppercase">Bitcoin Position</p>
-                  <p className="text-sm font-black text-slate-800 font-mono mt-0.5">{holdings.BTC} BTC</p>
-                  <p className="text-[11px] font-bold text-slate-500 mt-1">${(holdings.BTC * livePrices.BTC).toLocaleString(undefined, { maximumFractionDigits: 2 })} Value</p>
+                  <p className="text-base font-black text-slate-800 font-mono mt-0.5">{holdings.BTC} BTC</p>
+                  <p className="text-xs font-bold text-emerald-600 mt-1">${(holdings.BTC * livePrices.BTC).toLocaleString(undefined, { maximumFractionDigits: 2 })} Value</p>
                 </div>
-                <div className="bg-white p-3 rounded-xl border border-slate-150">
+                <div className="bg-white p-4 rounded-xl border border-slate-150 shadow-sm">
                   <p className="text-[10px] font-black text-slate-400 uppercase">Ethereum Position</p>
-                  <p className="text-sm font-black text-slate-800 font-mono mt-0.5">{holdings.ETH} ETH</p>
-                  <p className="text-[11px] font-bold text-slate-500 mt-1">${(holdings.ETH * livePrices.ETH).toLocaleString(undefined, { maximumFractionDigits: 2 })} Value</p>
+                  <p className="text-base font-black text-slate-800 font-mono mt-0.5">{holdings.ETH} ETH</p>
+                  <p className="text-xs font-bold text-emerald-600 mt-1">${(holdings.ETH * livePrices.ETH).toLocaleString(undefined, { maximumFractionDigits: 2 })} Value</p>
                 </div>
-                <div className="bg-white p-3 rounded-xl border border-slate-150">
+                <div className="bg-white p-4 rounded-xl border border-slate-150 shadow-sm">
                   <p className="text-[10px] font-black text-slate-400 uppercase">Solana Position</p>
-                  <p className="text-sm font-black text-slate-800 font-mono mt-0.5">{holdings.SOL} SOL</p>
-                  <p className="text-[11px] font-bold text-slate-500 mt-1">${(holdings.SOL * livePrices.SOL).toLocaleString(undefined, { maximumFractionDigits: 2 })} Value</p>
+                  <p className="text-base font-black text-slate-800 font-mono mt-0.5">{holdings.SOL} SOL</p>
+                  <p className="text-xs font-bold text-emerald-600 mt-1">${(holdings.SOL * livePrices.SOL).toLocaleString(undefined, { maximumFractionDigits: 2 })} Value</p>
                 </div>
-                <div className="bg-white p-3 rounded-xl border border-slate-150">
+                <div className="bg-white p-4 rounded-xl border border-slate-150 shadow-sm">
                   <p className="text-[10px] font-black text-slate-400 uppercase">Spot Gold Bullion</p>
-                  <p className="text-sm font-black text-slate-800 font-mono mt-0.5">{holdings.GLD} oz</p>
-                  <p className="text-[11px] font-bold text-slate-500 mt-1">${(holdings.GLD * livePrices.GLD).toLocaleString(undefined, { maximumFractionDigits: 2 })} Value</p>
+                  <p className="text-base font-black text-slate-800 font-mono mt-0.5">{holdings.GLD} oz</p>
+                  <p className="text-xs font-bold text-emerald-600 mt-1">${(holdings.GLD * livePrices.GLD).toLocaleString(undefined, { maximumFractionDigits: 2 })} Value</p>
                 </div>
               </div>
             </div>

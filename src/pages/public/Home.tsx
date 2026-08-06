@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Shield, Zap, Globe, ArrowRight, CheckCircle2, Landmark, Wifi, RotateCw, HelpCircle, CreditCard } from 'lucide-react';
+import { Shield, Zap, Globe, ArrowRight, CheckCircle2, Landmark, Wifi, RotateCw, HelpCircle, CreditCard, Lock, Unlock, TrendingUp, Coins, Sparkles, Activity } from 'lucide-react';
 import PublicNavbar from '../../components/layout/PublicNavbar';
 import { motion } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
+import toast from 'react-hot-toast';
+import TradingChart from '../../components/TradingChart';
 // @ts-ignore
 import bankHqBg from '../../assets/images/econest_bank_hq_1782508914035.jpg';
 
 const Home = () => {
   const [flippedCards, setFlippedCards] = useState<Record<number, boolean>>({});
+  const [isChartLocked, setIsChartLocked] = useState(true);
 
   const toggleCard = (index: number) => {
     setFlippedCards(prev => ({
@@ -88,6 +91,116 @@ const Home = () => {
                 <p className="text-slate-600 leading-relaxed">{feature.desc}</p>
               </motion.div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Live Financial Market Terminal Section */}
+      <section className="py-20 bg-slate-900 text-white relative overflow-hidden">
+        {/* Subtle background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none"></div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 pb-8 border-b border-slate-800 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-400 uppercase border border-rose-500/30">
+                  🔴 LIVE MARKET TERMINAL
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 uppercase border border-emerald-500/30">
+                  REAL-TIME TRADINGVIEW ANALYTICS
+                </span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                <TrendingUp className="h-8 w-8 text-emerald-400" />
+                Global Market & Asset Intelligence
+              </h2>
+              <p className="text-sm text-slate-400 max-w-2xl mt-2 leading-relaxed">
+                Analyze real-time crypto, foreign exchange, and precious metal trends using our embedded TradingView chart engine. 
+                Use the scroll lock toggle to enable seamless page navigation or interactive chart dragging.
+              </p>
+            </div>
+
+            {/* Surface Drag Control Toggle */}
+            <div className="flex items-center gap-2 bg-slate-800/90 p-2 rounded-2xl border border-slate-700/80 w-fit self-start lg:self-auto backdrop-blur-md shadow-lg">
+              <span className="text-xs font-bold text-slate-400 px-2 uppercase tracking-wider">Chart Interactivity:</span>
+              <button 
+                onClick={() => {
+                  setIsChartLocked(true);
+                  toast.success("Page scroll mode active. Dragging blocked on chart surface.");
+                }}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all ${isChartLocked ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 scale-105' : 'text-slate-400 hover:text-white bg-transparent'}`}
+              >
+                <Lock className="h-3.5 w-3.5" />
+                Easy Scroll (Locked)
+              </button>
+              <button 
+                onClick={() => {
+                  setIsChartLocked(false);
+                  toast.success("Interactive mode active. Dragging enabled inside chart surface.");
+                }}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all ${!isChartLocked ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 scale-105' : 'text-slate-400 hover:text-white bg-transparent'}`}
+              >
+                <Unlock className="h-3.5 w-3.5" />
+                Free Drag
+              </button>
+            </div>
+          </div>
+
+          {/* Live Price Tickers Bar */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            {[
+              { sym: 'BTC/USD', name: 'Bitcoin', price: '$68,420.50', change: '+2.45%' },
+              { sym: 'ETH/USD', name: 'Ethereum', price: '$3,850.20', change: '+1.82%' },
+              { sym: 'SOL/USD', name: 'Solana', price: '$148.75', change: '+4.12%' },
+              { sym: 'XAU/USD', name: 'Spot Gold', price: '$2,340.80', change: '+0.65%' }
+            ].map((ticker, idx) => (
+              <div key={idx} className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 backdrop-blur-sm hover:border-emerald-500/50 transition-all">
+                <div className="flex justify-between items-center text-xs font-black text-slate-400 uppercase tracking-wider mb-1">
+                  <span>{ticker.sym}</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-lg font-black font-mono text-white tracking-tight">{ticker.price}</span>
+                  <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">{ticker.change}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Chart Container */}
+          <div className="relative h-[480px] w-full overflow-hidden rounded-3xl border border-slate-700 bg-slate-950 shadow-2xl">
+            {/* Overlay Indicator if Scroll Lock is Active */}
+            {isChartLocked && (
+              <div className="absolute inset-0 bg-transparent z-[20] pointer-events-auto cursor-default flex items-center justify-center">
+                {/* Visual alert badge matching user screenshot */}
+                <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl text-[11px] font-black tracking-wider uppercase text-slate-100 border border-white/10 shadow-xl flex items-center gap-2">
+                  <Lock className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>SCROLL LOCK ACTIVE (DRAG PREVENTED)</span>
+                </div>
+              </div>
+            )}
+            
+            <div className={`w-full h-[510px] ${isChartLocked ? 'pointer-events-none opacity-90' : 'pointer-events-auto'}`}>
+              <TradingChart />
+            </div>
+          </div>
+
+          {/* CTA Banner below chart */}
+          <div className="mt-8 bg-gradient-to-r from-emerald-900/40 via-slate-800 to-slate-900 p-6 rounded-2xl border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-black">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-base font-extrabold text-white">Ready to trade live global assets?</h4>
+                <p className="text-xs text-slate-400">Open an account in under 3 minutes and access institutional liquidity.</p>
+              </div>
+            </div>
+            <Link to="/register" className="bg-emerald-500 text-slate-950 font-extrabold px-6 py-3 rounded-xl hover:bg-emerald-400 transition-all text-xs tracking-wider uppercase flex items-center gap-2 shadow-lg shadow-emerald-500/20 whitespace-nowrap">
+              <span>Open Trading Account</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       </section>
