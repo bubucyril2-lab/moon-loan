@@ -4,10 +4,79 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ECONEST BANK</title>
+    <meta name="description" content="A complete full-stack digital banking platform with public interface, customer dashboard, and admin management panel." />
+    <meta property="og:title" content="ECONEST BANK" />
+    <meta property="og:description" content="A complete full-stack digital banking platform with public interface, customer dashboard, and admin management panel." />
+
+    <!-- Early regional language auto-detection for instant whole-site translation -->
+    <script>
+      (function() {
+        try {
+          var STORAGE_KEY = 'econest_user_lang_pref';
+          var saved = localStorage.getItem(STORAGE_KEY);
+          var targetLang = saved;
+
+          if (!targetLang) {
+            // Auto-detect browser preferred language & country locale
+            var navLangs = (navigator.languages && navigator.languages.length > 0)
+              ? navigator.languages
+              : [navigator.language || ''];
+
+            var primary = (navLangs[0] || '').toLowerCase().trim();
+
+            if (primary.startsWith('zh-tw') || primary.startsWith('zh-hant') || primary.startsWith('zh-hk')) {
+              targetLang = 'zh-TW';
+            } else if (primary.startsWith('zh-cn') || primary.startsWith('zh-hans') || primary === 'zh') {
+              targetLang = 'zh-CN';
+            } else if (primary.startsWith('fil') || primary.startsWith('tl')) {
+              targetLang = 'tl';
+            } else if (primary.startsWith('iw') || primary.startsWith('he')) {
+              targetLang = 'iw';
+            } else {
+              var base = primary.split('-')[0];
+              if (base && base !== 'en') {
+                targetLang = base;
+              }
+            }
+
+            // Cross-reference timezone if browser language was generic English or unset
+            if (!targetLang || targetLang === 'en') {
+              try {
+                var tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '').toLowerCase();
+                var tzMap = {
+                  'madrid': 'es', 'mexico': 'es', 'bogota': 'es', 'buenos_aires': 'es', 'santiago': 'es', 'lima': 'es',
+                  'paris': 'fr', 'brussels': 'fr', 'montreal': 'fr',
+                  'berlin': 'de', 'vienna': 'de', 'zurich': 'de',
+                  'sao_paulo': 'pt', 'lisbon': 'pt',
+                  'rome': 'it', 'tokyo': 'ja', 'seoul': 'ko', 'shanghai': 'zh-CN',
+                  'riyadh': 'ar', 'dubai': 'ar', 'cairo': 'ar', 'moscow': 'ru', 'istanbul': 'tr'
+                };
+                for (var key in tzMap) {
+                  if (tz.indexOf(key) !== -1) {
+                    targetLang = tzMap[key];
+                    break;
+                  }
+                }
+              } catch(e) {}
+            }
+          }
+
+          // If language is non-English, set googtrans cookie so Google Translate auto-translates immediately
+          if (targetLang && targetLang !== 'en') {
+            var val = '/auto/' + targetLang;
+            document.cookie = 'googtrans=' + val + '; path=/;';
+            if (location.hostname !== 'localhost') {
+              document.cookie = 'googtrans=' + val + '; path=/; domain=' + location.hostname + ';';
+            }
+          }
+        } catch(err) {}
+      })();
+    </script>
   </head>
   <body>
+    <!-- Singleton hidden container for Google Translate element -->
+    <div id="google_translate_element" style="display:none;position:absolute;top:-9999px;left:-9999px;" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

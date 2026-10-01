@@ -35,6 +35,7 @@ import AdminSettings from './pages/admin/Settings';
 import AdminAuditLogs from './pages/admin/AuditLogs';
 import AdminPaymentMethods from './pages/admin/PaymentMethods';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import AutoTranslateNotification from './components/common/AutoTranslateNotification';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; role?: 'admin' | 'customer' }> = ({ children, role }) => {
   const { user, isLoading } = useAuth();
@@ -74,6 +75,7 @@ export default function App() {
       <AuthProvider>
         <Router>
             <Toaster position="top-right" />
+            <AutoTranslateNotification />
             <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
