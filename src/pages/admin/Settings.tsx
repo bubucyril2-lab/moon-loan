@@ -139,11 +139,17 @@ const AdminSettings = () => {
               <div className="pt-6 border-t border-slate-100 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-bold text-slate-900">Maintenance Mode</p>
-                    <p className="text-xs text-slate-500">Disable all customer features temporarily</p>
+                    <p className="text-sm font-bold text-slate-900">404 Under Management Lockdown</p>
+                    <p className="text-xs text-slate-500">Locks the entire site with a 404 Under Management error screen</p>
                   </div>
                   <button 
-                    onClick={() => setSettings({...settings, maintenance_mode: settings.maintenance_mode === 'true' ? 'false' : 'true'})}
+                    onClick={() => {
+                      const next = settings.maintenance_mode === 'true' ? 'false' : 'true';
+                      setSettings({...settings, maintenance_mode: next});
+                      if (next === 'true') {
+                        localStorage.removeItem('econest_bypass_lock');
+                      }
+                    }}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                       settings.maintenance_mode === 'true' ? 'bg-red-500' : 'bg-slate-200'
                     }`}

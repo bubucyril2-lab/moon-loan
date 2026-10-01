@@ -36,6 +36,7 @@ import AdminAuditLogs from './pages/admin/AuditLogs';
 import AdminPaymentMethods from './pages/admin/PaymentMethods';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import AutoTranslateNotification from './components/common/AutoTranslateNotification';
+import UnderManagement404 from './pages/public/UnderManagement404';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; role?: 'admin' | 'customer' }> = ({ children, role }) => {
   const { user, isLoading } = useAuth();
@@ -70,55 +71,84 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 export default function App() {
+  const [isBypassed, setIsBypassed] = React.useState<boolean>(() => {
+    return localStorage.getItem('econest_bypass_lock') === 'true';
+  });
+
+  const handleReLock = () => {
+    localStorage.removeItem('econest_bypass_lock');
+    setIsBypassed(false);
+  };
+
   return (
     <ErrorBoundary>
       <AuthProvider>
         <Router>
-            <Toaster position="top-right" />
-            <AutoTranslateNotification />
-            <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<Home />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/services" element={<Services />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-            <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-            <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+          <Toaster position="top-right" />
+          {!isBypassed ? (
+            <UnderManagement404 onBypass={() => setIsBypassed(true)} />
+          ) : (
+            <>
+              {/* Admin Active Bypass Banner */}
+              <div className="bg-amber-500 text-slate-950 px-3 py-1 text-xs font-bold flex items-center justify-between z-50 sticky top-0 shadow-md">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-slate-950 animate-ping"></span>
+                  <span>404 Under Management Active (Public Blocked) — You are currently previewing as Authorized Admin</span>
+                </div>
+                <button
+                  onClick={handleReLock}
+                  className="bg-slate-900 hover:bg-slate-800 text-white px-2.5 py-0.5 rounded text-[11px] font-semibold transition-colors"
+                >
+                  Re-lock Website (404)
+                </button>
+              </div>
 
-            {/* Customer Routes */}
-            <Route path="/dashboard" element={
-              <ProtectedRoute role="customer">
-                <CustomerLayout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<CustomerDashboard />} />
-              <Route path="transfers" element={<CustomerTransfers />} />
-              <Route path="history" element={<CustomerHistory />} />
-              <Route path="chat" element={<CustomerChat />} />
-              <Route path="loans" element={<CustomerLoans />} />
-              <Route path="settings" element={<CustomerSettings />} />
-              <Route path="notifications" element={<CustomerNotifications />} />
-            </Route>
+              <AutoTranslateNotification />
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<Home />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/services" element={<Services />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+                <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+                <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
 
-            {/* Admin Routes */}
-            <Route path="/admin" element={
-              <ProtectedRoute role="admin">
-                <AdminLayout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<AdminDashboard />} />
-              <Route path="customers" element={<AdminCustomers />} />
-              <Route path="transactions" element={<AdminTransactions />} />
-              <Route path="chat" element={<AdminChat />} />
-              <Route path="loans" element={<AdminLoans />} />
-              <Route path="settings" element={<AdminSettings />} />
-              <Route path="payment-methods" element={<AdminPaymentMethods />} />
-              <Route path="audit-logs" element={<AdminAuditLogs />} />
-            </Route>
+                {/* Customer Routes */}
+                <Route path="/dashboard" element={
+                  <ProtectedRoute role="customer">
+                    <CustomerLayout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<CustomerDashboard />} />
+                  <Route path="transfers" element={<CustomerTransfers />} />
+                  <Route path="history" element={<CustomerHistory />} />
+                  <Route path="chat" element={<CustomerChat />} />
+                  <Route path="loans" element={<CustomerLoans />} />
+                  <Route path="settings" element={<CustomerSettings />} />
+                  <Route path="notifications" element={<CustomerNotifications />} />
+                </Route>
 
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
+                {/* Admin Routes */}
+                <Route path="/admin" element={
+                  <ProtectedRoute role="admin">
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="customers" element={<AdminCustomers />} />
+                  <Route path="transactions" element={<AdminTransactions />} />
+                  <Route path="chat" element={<AdminChat />} />
+                  <Route path="loans" element={<AdminLoans />} />
+                  <Route path="settings" element={<AdminSettings />} />
+                  <Route path="payment-methods" element={<AdminPaymentMethods />} />
+                  <Route path="audit-logs" element={<AdminAuditLogs />} />
+                </Route>
+
+                <Route path="*" element={<Navigate to="/" />} />
+              </Routes>
+            </>
+          )}
         </Router>
       </AuthProvider>
     </ErrorBoundary>
