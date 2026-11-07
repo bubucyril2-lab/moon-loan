@@ -17,7 +17,7 @@ import {
   orderBy,
   limit
 } from 'firebase/firestore';
-import { User, Account, Transaction, Notification, ChatMessage, Deposit, Loan, Beneficiary, ContactMessage } from '../types';
+import { User, Account, Transaction, Notification, ChatMessage, EmailMessage, Deposit, Loan, Beneficiary, ContactMessage } from '../types';
 
 export interface AuditLog {
   id: string;
@@ -278,6 +278,94 @@ class StorageService {
       callback(snapshot.docs.map(doc => doc.data() as ChatMessage));
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'chat_messages');
+    });
+  }
+
+  // Email Messages (Official Bank Email Correspondence)
+  async getEmailMessages(userId?: string): Promise<EmailMessage[]> {
+    const dedupe = (list: EmailMessage[]) => {
+      const map = new Map<string, EmailMessage>();
+      list.forEach(item => {
+        if (item?.id) map.set(item.id, item);
+      });
+      return Array.from(map.values()).sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+    };
+
+    try {
+      let q = query(collection(db, 'email_messages'), orderBy('createdAt', 'asc'));
+      if (userId) {
+        q = query(collection(db, 'email_messages'), where('userId', '==', userId), orderBy('createdAt', 'asc'));
+      }
+      const snapshot = await getDocs(q);
+      const items = dedupe(snapshot.docs.map(doc => doc.data() as EmailMessage));
+      if (items.length > 0) {
+        // Cache to local storage
+        try {
+          const cacheKey = userId ? `econest_email_msgs_${userId}` : 'econest_email_msgs_all';
+          localStorage.setItem(cacheKey, JSON.stringify(items));
+        } catch (_) {}
+        return items;
+      }
+      // Check local cache fallback
+      const cacheKey = userId ? `econest_email_msgs_${userId}` : 'econest_email_msgs_all';
+      const cached = localStorage.getItem(cacheKey);
+      return cached ? dedupe(JSON.parse(cached)) : [];
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'email_messages');
+      const cacheKey = userId ? `econest_email_msgs_${userId}` : 'econest_email_msgs_all';
+      const cached = localStorage.getItem(cacheKey);
+      return cached ? dedupe(JSON.parse(cached)) : [];
+    }
+  }
+
+  async saveEmailMessage(message: EmailMessage): Promise<void> {
+    try {
+      await setDoc(doc(db, 'email_messages', message.id), message);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `email_messages/${message.id}`);
+    }
+    // Update local cache
+    try {
+      const cacheKey = `econest_email_msgs_${message.userId}`;
+      const existing = localStorage.getItem(cacheKey);
+      const list: EmailMessage[] = existing ? JSON.parse(existing) : [];
+      const updated = [...list.filter(m => m.id !== message.id), message].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+      localStorage.setItem(cacheKey, JSON.stringify(updated));
+    } catch (_) {}
+  }
+
+  onEmailMessages(userId: string | undefined, callback: (messages: EmailMessage[]) => void) {
+    const dedupe = (list: EmailMessage[]) => {
+      const map = new Map<string, EmailMessage>();
+      list.forEach(item => {
+        if (item?.id) map.set(item.id, item);
+      });
+      return Array.from(map.values()).sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+    };
+
+    let q = query(collection(db, 'email_messages'), orderBy('createdAt', 'asc'));
+    if (userId) {
+      q = query(collection(db, 'email_messages'), where('userId', '==', userId), orderBy('createdAt', 'asc'));
+    }
+    return onSnapshot(q, (snapshot) => {
+      const items = dedupe(snapshot.docs.map(doc => doc.data() as EmailMessage));
+      callback(items);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'email_messages');
+      // If snapshot fails, fallback to local storage
+      const cacheKey = userId ? `econest_email_msgs_${userId}` : 'econest_email_msgs_all';
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          callback(dedupe(JSON.parse(cached)));
+        } catch (_) {}
+      }
     });
   }
 

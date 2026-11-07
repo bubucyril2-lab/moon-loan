@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, User, Send, MessageSquare, ShieldCheck, Loader2, ArrowLeft } from 'lucide-react';
+import { Search, User, Send, MessageSquare, ShieldCheck, Loader2, ArrowLeft, X, Mail, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../hooks/useChat';
 import { storageService } from '../../services/storage';
+import { emailService } from '../../services/emailService';
 import { format } from 'date-fns';
 import { safeFormat } from '../../utils/date';
+import toast from 'react-hot-toast';
 
 interface Customer {
   id: string;
@@ -45,8 +47,10 @@ const AdminChat = () => {
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !selectedCustomer) return;
-    sendMessage(input);
+    const msgText = input.trim();
+    sendMessage(msgText);
     setInput('');
+    toast.success(`Live response sent to ${selectedCustomer.full_name}`);
   };
 
   const filteredCustomers = customers.filter(c => 
@@ -83,11 +87,11 @@ const AdminChat = () => {
               <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
                 <User className="h-5 w-5 text-slate-600" />
               </div>
-              <div className="text-left overflow-hidden">
-                <p className={`text-sm font-bold truncate ${selectedCustomer?.id === customer.id ? 'text-emerald-700' : 'text-slate-900'}`}>
+              <div className="text-left min-w-0 flex-1">
+                <p className={`text-sm font-bold break-words ${selectedCustomer?.id === customer.id ? 'text-emerald-700' : 'text-slate-900'}`}>
                   {customer.full_name}
                 </p>
-                <p className="text-xs text-slate-500 truncate">{customer.email}</p>
+                <p className="text-xs text-slate-500 break-all mt-0.5">{customer.email}</p>
               </div>
             </button>
           ))}
@@ -99,10 +103,11 @@ const AdminChat = () => {
         {selectedCustomer ? (
           <>
             <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <button 
                   onClick={() => setSelectedCustomer(null)}
-                  className="md:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-600"
+                  title="Return to Customer Conversations"
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </button>
@@ -111,32 +116,53 @@ const AdminChat = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900">{selectedCustomer.full_name}</h3>
-                  <p className="text-xs text-slate-500 uppercase font-bold tracking-tighter">{selectedCustomer.status} Account</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-mono">{selectedCustomer.email}</span>
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold uppercase">
+                      {selectedCustomer.status}
+                    </span>
+                  </div>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedCustomer(null)}
+                  className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400 hover:text-slate-700"
+                  title="Close Customer Chat"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
             </div>
 
             <div 
               ref={scrollRef}
-              className="flex-1 bg-slate-50 overflow-y-auto p-6 space-y-4"
+              className="flex-1 bg-slate-50 overflow-y-auto p-4 sm:p-6 space-y-3"
             >
-              {messages.map((msg) => (
-                <div 
-                  key={msg.id} 
-                  className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className={`max-w-[80%] rounded-2xl p-4 shadow-sm ${
-                    msg.senderId === user?.id 
-                      ? 'bg-slate-900 text-white rounded-tr-none' 
-                      : 'bg-white text-slate-900 border border-slate-200 rounded-tl-none'
-                  }`}>
-                    <p className="text-sm leading-relaxed">{msg.text}</p>
-                    <p className={`text-[10px] mt-2 opacity-60 ${msg.senderId === user?.id ? 'text-right' : 'text-left'}`}>
-                      {safeFormat(msg.createdAt, 'HH:mm')}
-                    </p>
+              {messages.map((msg, idx) => {
+                const isMe = msg.isAdmin || msg.senderId === user?.id;
+                return (
+                  <div 
+                    key={`${msg.id || 'msg'}-${idx}`} 
+                    className={`w-full flex ${isMe ? 'justify-end' : 'justify-start'} my-1.5`}
+                  >
+                    <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 shadow-sm ${
+                      isMe 
+                        ? 'bg-slate-900 text-white rounded-tr-none ml-auto' 
+                        : 'bg-white text-slate-900 border border-slate-200 rounded-tl-none mr-auto'
+                    }`}>
+                      <p className={`text-[10px] font-bold mb-1 ${isMe ? 'text-slate-300 text-right' : 'text-slate-400 text-left'}`}>
+                        {isMe ? 'You (Admin)' : selectedCustomer.full_name}
+                      </p>
+                      <p className="text-sm leading-relaxed">{msg.text}</p>
+                      <p className={`text-[10px] mt-1.5 ${isMe ? 'text-right text-slate-400' : 'text-left text-slate-400'}`}>
+                        {safeFormat(msg.createdAt, 'HH:mm')}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {messages.length === 0 && (
                 <div className="h-full flex flex-col items-center justify-center text-slate-400">
                   <MessageSquare className="h-12 w-12 mb-2 opacity-20" />

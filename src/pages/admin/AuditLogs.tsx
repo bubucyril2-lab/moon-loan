@@ -88,63 +88,100 @@ const AuditLogs = () => {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Timestamp</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Administrator</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Details</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-20 text-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
-                  </td>
-                </tr>
-              ) : filteredLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <Clock className="h-4 w-4 text-slate-400" />
-                      <span className="text-sm font-medium">{safeFormat(log.createdAt, 'MMM d, yyyy HH:mm:ss')}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
-                        <User className="h-4 w-4 text-slate-600" />
-                      </div>
-                      <span className="text-sm font-bold text-slate-900">{log.adminName}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-[10px] font-bold uppercase tracking-wider border border-slate-200">
-                      {log.action.replace(/_/g, ' ')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm text-slate-600 max-w-md truncate" title={log.details}>
-                      {log.details}
-                    </p>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!isLoading && filteredLogs.length === 0 && (
-            <div className="p-20 text-center">
-              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Shield className="h-8 w-8 text-slate-300" />
-              </div>
-              <p className="text-slate-500 font-medium">No audit logs found</p>
-              <p className="text-sm text-slate-400 mt-1">Try adjusting your search or filters</p>
+        {/* Loading State */}
+        {isLoading && (
+          <div className="p-20 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-2" />
+            <p className="text-xs text-slate-400">Loading audit trail...</p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && filteredLogs.length === 0 && (
+          <div className="p-20 text-center">
+            <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Shield className="h-8 w-8 text-slate-300" />
             </div>
-          )}
-        </div>
+            <p className="text-slate-500 font-medium">No audit logs found</p>
+            <p className="text-sm text-slate-400 mt-1">Try adjusting your search or filters</p>
+          </div>
+        )}
+
+        {/* 1. MOBILE & TABLET RESPONSIVE CARDS (< 1024px, Zero Horizontal Scroll) */}
+        {!isLoading && filteredLogs.length > 0 && (
+          <div className="divide-y divide-slate-100 lg:hidden">
+            {filteredLogs.map((log) => (
+              <div key={log.id} className="p-4 space-y-2.5 hover:bg-slate-50/60 transition-colors">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 bg-slate-100 rounded-lg flex items-center justify-center">
+                      <User className="h-3.5 w-3.5 text-slate-600" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-900">{log.adminName}</span>
+                  </div>
+                  <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 rounded-full text-[9px] font-bold uppercase tracking-wider border border-slate-200">
+                    {log.action.replace(/_/g, ' ')}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 leading-relaxed">
+                  {log.details}
+                </p>
+
+                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+                  <Clock className="h-3 w-3 text-slate-400" />
+                  <span>{safeFormat(log.createdAt, 'MMM d, yyyy • HH:mm:ss')}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 2. DESKTOP TABLE VIEW (Visible only on lg screens >= 1024px) */}
+        {!isLoading && filteredLogs.length > 0 && (
+          <div className="hidden lg:block overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/50">
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Timestamp</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Administrator</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredLogs.map((log) => (
+                  <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <Clock className="h-4 w-4 text-slate-400" />
+                        <span className="text-sm font-medium">{safeFormat(log.createdAt, 'MMM d, yyyy HH:mm:ss')}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+                          <User className="h-4 w-4 text-slate-600" />
+                        </div>
+                        <span className="text-sm font-bold text-slate-900">{log.adminName}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-[10px] font-bold uppercase tracking-wider border border-slate-200">
+                        {log.action.replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm text-slate-600 break-words leading-relaxed">
+                        {log.details}
+                      </p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

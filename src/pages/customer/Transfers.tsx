@@ -15,20 +15,38 @@ import {
   RefreshCw,
   Wallet,
   Globe,
-  Check
+  Check,
+  Mail,
+  Layers,
+  CreditCard,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  AlertTriangle,
+  FileCheck,
+  Landmark,
+  X,
+  Coins,
+  Lock
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { Account } from '../../types';
+import { Account, FeeReason, TransferScreenConfig } from '../../types';
 import toast from 'react-hot-toast';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { storageService } from '../../services/storage';
+import { emailService } from '../../services/emailService';
+import { DEFAULT_FEE_REASONS, DEFAULT_TRANSFER_SCREEN_CONFIG } from '../../services/bankConfig';
+import { WORLD_CURRENCIES, CountryCurrency } from '../../data/currencies';
 
 const CustomerTransfers = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [account, setAccount] = useState<Account | null>(null);
   const [recipientAccount, setRecipientAccount] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [feeNoticeExpanded, setFeeNoticeExpanded] = useState(true);
+  const [feeProofSubmitted, setFeeProofSubmitted] = useState(false);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [pin, setPin] = useState('');
@@ -37,6 +55,8 @@ const CustomerTransfers = () => {
   const [swiftCode, setSwiftCode] = useState('');
   const [transferType, setTransferType] = useState<'local' | 'international'>('local');
   const [currency, setCurrency] = useState('USD');
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
+  const [currencySearch, setCurrencySearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState<number>(1); // 1: Form, 2: Confirmation, 2.5: Processing, 3: Success
   const [countdown, setCountdown] = useState(30);
@@ -44,12 +64,23 @@ const CustomerTransfers = () => {
   const [generatedRef, setGeneratedRef] = useState('');
   const [generatedTime, setGeneratedTime] = useState('');
 
-  const currencies = [
-    'USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'HKD', 'NZD',
-    'SEK', 'KRW', 'SGD', 'NOK', 'MXN', 'INR', 'RUB', 'ZAR', 'TRY', 'BRL',
-    'TWD', 'DKK', 'PLN', 'THB', 'IDR', 'HUF', 'CZK', 'ILS', 'CLP', 'PHP',
-    'AED', 'COP', 'SAR', 'MYR', 'RON', 'VND', 'KWD', 'QAR', 'EGP', 'NGN'
-  ];
+  const selectedCurr = WORLD_CURRENCIES.find(c => c.code === currency) || WORLD_CURRENCIES[0];
+
+  const filteredCurrencies = WORLD_CURRENCIES.filter(c => {
+    const q = currencySearch.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      c.code.toLowerCase().includes(q) ||
+      c.country.toLowerCase().includes(q) ||
+      c.name.toLowerCase().includes(q) ||
+      c.symbol.toLowerCase().includes(q)
+    );
+  });
+
+  // Admin Configurable Fee & Screen Settings
+  const [feeEnabled, setFeeEnabled] = useState(true);
+  const [feeReasons, setFeeReasons] = useState<FeeReason[]>(DEFAULT_FEE_REASONS);
+  const [transferScreenConfig, setTransferScreenConfig] = useState<TransferScreenConfig>(DEFAULT_TRANSFER_SCREEN_CONFIG);
 
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [isAddingBeneficiary, setIsAddingBeneficiary] = useState(false);
@@ -72,10 +103,46 @@ const CustomerTransfers = () => {
       }
     };
 
+    const fetchSettings = async () => {
+      try {
+        const data = await storageService.getSettings();
+        if (data) {
+          if (data.fee_enabled !== undefined) {
+            setFeeEnabled(Boolean(data.fee_enabled));
+          }
+          if (data.fee_reasons) {
+            try {
+              const parsed = typeof data.fee_reasons === 'string' ? JSON.parse(data.fee_reasons) : data.fee_reasons;
+              if (Array.isArray(parsed) && parsed.length > 0) setFeeReasons(parsed);
+            } catch (e) {}
+          }
+          if (data.transfer_screen_config) {
+            try {
+              const parsed = typeof data.transfer_screen_config === 'string' ? JSON.parse(data.transfer_screen_config) : data.transfer_screen_config;
+              if (parsed && typeof parsed === 'object') {
+                setTransferScreenConfig(prev => ({
+                  ...prev,
+                  ...parsed,
+                  showReceiverEmailInTransfer: parsed.showReceiverEmailInTransfer !== undefined
+                    ? Boolean(parsed.showReceiverEmailInTransfer)
+                    : false,
+                  singleFeeAtATime: parsed.singleFeeAtATime !== undefined
+                    ? Boolean(parsed.singleFeeAtATime)
+                    : true
+                }));
+              }
+            } catch (e) {}
+          }
+        }
+      } catch (e) {
+        console.warn('Could not load transfer settings:', e);
+      }
+    };
+
     const fetchAllData = async () => {
       setIsLoading(true);
       try {
-        await Promise.all([fetchAccount(), fetchBeneficiaries()]);
+        await Promise.all([fetchAccount(), fetchBeneficiaries(), fetchSettings()]);
       } finally {
         setIsLoading(false);
       }
@@ -83,6 +150,20 @@ const CustomerTransfers = () => {
 
     fetchAllData();
   }, [user]);
+
+  // Calculate dynamic active transfer fee
+  const activeReasons = feeReasons.filter(r => r.isEnabled);
+  const calculatedFee = feeEnabled 
+    ? (activeReasons.length > 0 
+        ? activeReasons.reduce((sum, r) => sum + r.amount, 0) 
+        : (transferType === 'local' ? 5 : 25))
+    : 0;
+
+  const feeReasonLabel = feeEnabled
+    ? (activeReasons.length > 0 
+        ? activeReasons.map(r => r.name).join(' + ') 
+        : (transferType === 'local' ? 'Standard Clearance Fee' : 'International Wire Fee'))
+    : 'Fee Waived ($0.00 Promo)';
 
   const handleAddBeneficiary = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,12 +191,14 @@ const CustomerTransfers = () => {
     if (!user || !account) return;
 
     try {
-      const transferAmount = parseFloat(amount);
-      const fee = transferType === 'local' ? 5 : 25;
-      const totalDebit = transferAmount + fee;
+      const rawAmount = parseFloat(amount || "0");
+      const rate = selectedCurr.rateToUsd || 1;
+      const transferAmountInUsd = transferType === 'international' && currency !== 'USD' ? (rawAmount * rate) : rawAmount;
+      const fee = calculatedFee;
+      const totalDebit = transferAmountInUsd + fee;
 
       if (account.balance < totalDebit) {
-        throw new Error('INSUFFICIENT BALANCE');
+        throw new Error(`INSUFFICIENT BALANCE (Required: $${totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD)`);
       }
 
       const userPin = user?.transactionPin;
@@ -163,9 +246,12 @@ const CustomerTransfers = () => {
         const finalizeTransaction = async () => {
           setIsLoading(true);
           try {
-            const transferAmount = parseFloat(amount || "0");
-            const fee = transferType === 'local' ? 5 : 25;
-            const totalDebit = transferAmount + fee;
+            const rawAmount = parseFloat(amount || "0");
+            const transferAmount = rawAmount;
+            const rate = selectedCurr.rateToUsd || 1;
+            const transferAmountInUsd = transferType === 'international' && currency !== 'USD' ? (rawAmount * rate) : rawAmount;
+            const fee = calculatedFee;
+            const totalDebit = transferAmountInUsd + fee;
 
             if (account && user) {
               await storageService.saveAccount({
@@ -177,11 +263,19 @@ const CustomerTransfers = () => {
                 id: Math.random().toString(36).substr(2, 9),
                 accountId: account.id,
                 userId: user.id,
-                amount: transferAmount,
+                senderEmail: user.email,
+                recipientName,
+                recipientAccount,
+                recipientEmail: recipientEmail.trim(),
+                bankName: bankName || 'ECONEST BANK',
+                amount: rawAmount,
+                fee: calculatedFee,
+                feeReason: feeReasonLabel,
+                transferType,
                 type: 'debit',
-                description: `Transfer to ${recipientName} (${recipientAccount})`,
+                description: description || `${transferType === 'international' ? 'International SWIFT Wire' : 'Domestic Clearance Wire'} to ${recipientName} (${selectedCurr.country})`,
                 status: 'completed',
-                reference_id: generatedRef,
+                referenceId: generatedRef,
                 created_at: generatedTime
               });
 
@@ -189,10 +283,28 @@ const CustomerTransfers = () => {
                 id: Math.random().toString(36).substr(2, 9),
                 userId: user.id,
                 title: 'Funds Transferred Successfully',
-                message: `Your transfer of $${transferAmount.toLocaleString()} to ${recipientName} (${recipientAccount}) was processed. Ref: ${generatedRef}`,
+                message: `Your transfer of $${transferAmount.toLocaleString()} to ${recipientName} (${recipientAccount}) was processed. Fee: $${fee.toFixed(2)} (${feeReasonLabel}). Ref: ${generatedRef}`,
                 type: 'transaction',
                 isRead: false,
                 createdAt: generatedTime
+              });
+
+              // Dispatch real SMTP email alert to Admin, Customer & Receiver!
+              emailService.sendTransferEmail({
+                senderEmail: user.email,
+                senderName: user.fullName || user.full_name || 'Valued Customer',
+                senderAccount: account.accountNumber || account.account_number || 'N/A',
+                recipientName,
+                recipientAccount,
+                recipientEmail: recipientEmail.trim(),
+                bankName: bankName || 'ECONEST BANK',
+                amount: transferAmount,
+                currency,
+                fee: calculatedFee,
+                feeReason: feeReasonLabel,
+                referenceId: generatedRef,
+                timestamp: generatedTime,
+                description
               });
 
               // Also trigger a refresh of account balance info in the background
@@ -220,7 +332,7 @@ const CustomerTransfers = () => {
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [step, countdown, account, amount, transferType, generatedRef, generatedTime, recipientName, recipientAccount, user]);
+  }, [step, countdown, account, amount, transferType, generatedRef, generatedTime, recipientName, recipientAccount, user, calculatedFee, feeReasonLabel, currency, description, bankName]);
 
   const handleBack = () => {
     if (step === 2) {
@@ -371,8 +483,10 @@ const CustomerTransfers = () => {
 
   if (step === 3) {
     const transferAmount = parseFloat(amount || "0");
-    const fee = transferType === 'local' ? 5 : 25;
-    const totalDebit = transferAmount + fee;
+    const rate = selectedCurr.rateToUsd || 1;
+    const transferAmountInUsd = transferType === 'international' && currency !== 'USD' ? (transferAmount * rate) : transferAmount;
+    const fee = calculatedFee;
+    const totalDebit = transferAmountInUsd + fee;
 
     const copyReceiptToClipboard = () => {
       const textToCopy = `
@@ -457,20 +571,26 @@ Description: ${description || 'N/A'}
           }
         `}} />
 
-        {/* Action Header */}
+        {/* Action Header with Admin Custom Title and Subtitle */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 no-print pb-4 border-b border-slate-200">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Receipt Generated</h2>
-            <p className="text-xs text-slate-500 uppercase font-semibold">Your funds have been delivered safely</p>
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+              {transferScreenConfig.successTitle || 'Receipt Generated'}
+            </h2>
+            <p className="text-xs text-slate-500 uppercase font-semibold">
+              {transferScreenConfig.successSubtitle || 'Your funds have been delivered safely'}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-            >
-              <Printer className="h-4 w-4 text-slate-500" />
-              Print / Save PDF
-            </button>
+            {transferScreenConfig.showPrintButton && (
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <Printer className="h-4 w-4 text-slate-500" />
+                Print / Save PDF
+              </button>
+            )}
             <button
               onClick={copyReceiptToClipboard}
               className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
@@ -478,15 +598,309 @@ Description: ${description || 'N/A'}
               <Copy className="h-4 w-4 text-slate-500" />
               Copy Advice
             </button>
-            <button
-              onClick={handleShare}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-emerald-900/10"
-            >
-              <Share2 className="h-4 w-4 text-emerald-100" />
-              Share
-            </button>
+            {transferScreenConfig.showShareButton && (
+              <button
+                onClick={handleShare}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-emerald-900/10"
+              >
+                <Share2 className="h-4 w-4 text-emerald-100" />
+                Share
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Admin Customized Notice Banner */}
+        {transferScreenConfig.noticeBannerText && (
+          <div className={`p-4 rounded-2xl border text-xs sm:text-sm font-medium leading-relaxed shadow-xs no-print ${
+            transferScreenConfig.noticeBannerType === 'warning'
+              ? 'bg-amber-50 text-amber-900 border-amber-200'
+              : transferScreenConfig.noticeBannerType === 'info'
+              ? 'bg-sky-50 text-sky-900 border-sky-200'
+              : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+          }`}>
+            <div className="flex items-start gap-2.5">
+              <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
+              <div>{transferScreenConfig.noticeBannerText}</div>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* ADMIN CUSTOM FEE PAYMENT MESSAGE (ON/OFF - SINGLE OR MULTIPLE) */}
+        {/* ============================================================== */}
+        {transferScreenConfig.feePaymentMessageEnabled && (
+          <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white rounded-3xl p-5 sm:p-7 border-2 border-amber-500/30 shadow-2xl space-y-5 no-print relative overflow-hidden">
+            {/* Subtle amber accent bar */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-emerald-400"></div>
+
+            {/* Header with Title and Mode Indicator */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-400">
+                      Official Clearance Directive
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase">
+                      {transferScreenConfig.feePaymentMode === 'multiple' ? 'Sequential Multi-Stage Fee' : 'Single Clearance Fee'}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black text-white tracking-tight mt-0.5">
+                    Mandatory Settlement Fee Payment Required
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => setFeeNoticeExpanded(!feeNoticeExpanded)}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700"
+                >
+                  {feeNoticeExpanded ? (
+                    <>
+                      <ChevronUp className="h-3.5 w-3.5" />
+                      <span>Collapse</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-3.5 w-3.5" />
+                      <span>View Fee Requirements</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {feeNoticeExpanded && (
+              <div className="space-y-5 animate-in fade-in duration-200">
+                {/* MODE 1: SINGLE PAYMENT */}
+                {transferScreenConfig.feePaymentMode === 'single' ? (
+                  <div className="bg-slate-800/70 rounded-2xl p-5 border border-slate-700/80 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-700/60">
+                      <div>
+                        <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">One-Time Settlement Fee</span>
+                        <h4 className="text-base font-bold text-white">
+                          {transferScreenConfig.singleFeeMessage?.title || 'Mandatory Regulatory Settlement Fee'}
+                        </h4>
+                      </div>
+                      <div className="text-left sm:text-right">
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold block">Required Amount</span>
+                        <span className="text-2xl font-black text-amber-400 font-mono">
+                          ${Number(transferScreenConfig.singleFeeMessage?.amount || 350).toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      {transferScreenConfig.singleFeeMessage?.description || 'Federal regulatory clearance fee must be remitted before outgoing funds are permanently credited.'}
+                    </p>
+
+                    {transferScreenConfig.singleFeeMessage?.instructions && (
+                      <div className="bg-slate-900/90 rounded-xl p-3.5 border border-slate-700/70 text-xs text-slate-300 space-y-1">
+                        <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-amber-400" />
+                          Payment & Remittance Instructions:
+                        </span>
+                        <p className="leading-relaxed pl-4">
+                          {transferScreenConfig.singleFeeMessage?.instructions}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Escrow Details */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-900/60 p-3.5 rounded-xl border border-slate-800 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Designated Escrow Account</span>
+                        <span className="font-mono font-bold text-emerald-400 text-xs sm:text-sm">
+                          {transferScreenConfig.singleFeeMessage?.accountNumber || 'ESC-8849-0192-EC'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Clearing Institution</span>
+                        <span className="font-bold text-white text-xs sm:text-sm">
+                          {transferScreenConfig.singleFeeMessage?.bankName || 'ECONEST Escrow Clearance Bank'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Clearing Routing Code</span>
+                        <span className="font-mono font-bold text-amber-300 text-xs sm:text-sm">
+                          {transferScreenConfig.singleFeeMessage?.routingCode || 'ECNTUS33CLR'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {transferScreenConfig.singleFeeMessage?.urgencyText && (
+                      <div className="flex items-center gap-2 text-xs text-amber-300 bg-amber-500/10 px-3.5 py-2.5 rounded-xl border border-amber-500/20 font-semibold">
+                        <Clock className="h-4 w-4 shrink-0 text-amber-400" />
+                        <span>{transferScreenConfig.singleFeeMessage?.urgencyText}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* MODE 2: SEQUENTIAL STAGES (ONLY SINGLE FEE COMES AT A TIME) */
+                  <div className="space-y-4">
+                    {(() => {
+                      const stages = transferScreenConfig.multipleFeeStages || [];
+                      const activeStage = stages[0];
+                      if (!activeStage) return null;
+
+                      return (
+                        <>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
+                                  Settlement Protocol • Step {activeStage.stageNumber || 1} of {stages.length}
+                                </span>
+                                <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-500/30 uppercase">
+                                  Active Surcharge
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-300 mt-0.5">
+                                Mandatory clearance requirement: Settle this active single fee to progress settlement.
+                              </p>
+                            </div>
+                            <div className="text-left sm:text-right">
+                              <span className="text-[10px] text-slate-400 uppercase block font-semibold">Active Amount Due</span>
+                              <span className="text-xl font-black text-amber-400 font-mono">
+                                ${Number(activeStage.amount).toFixed(2)} USD
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* ONLY SINGLE ACTIVE FEE CARD APPEARS */}
+                          <div 
+                            key={activeStage.id || 0}
+                            className="bg-slate-800/80 rounded-2xl p-4 sm:p-5 border border-amber-500/30 space-y-3 relative overflow-hidden transition-all shadow-lg shadow-black/20"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/60 pb-3">
+                              <div className="flex items-center gap-3">
+                                <span className="w-8 h-8 rounded-full bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center shrink-0 shadow-sm">
+                                  {activeStage.stageNumber || 1}
+                                </span>
+                                <div>
+                                  <span className="text-[10px] text-amber-400 font-mono font-bold uppercase tracking-wider">
+                                    Current Payment Step {activeStage.stageNumber || 1} of {stages.length}
+                                  </span>
+                                  <h4 className="text-sm sm:text-base font-bold text-white">
+                                    {activeStage.title}
+                                  </h4>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-start sm:self-auto pl-11 sm:pl-0">
+                                <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                  {activeStage.statusText || 'Required - Step 1'}
+                                </span>
+                                <span className="text-base sm:text-lg font-black text-amber-400 font-mono">
+                                  ${Number(activeStage.amount).toFixed(2)} USD
+                                </span>
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-slate-300 leading-relaxed pl-11 sm:pl-0">
+                              {activeStage.description}
+                            </p>
+
+                            {activeStage.instructions && (
+                              <div className="bg-slate-900/90 rounded-xl p-3 border border-slate-700/70 text-xs text-slate-300 pl-11 sm:pl-3">
+                                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block mb-0.5">
+                                  Instructions for this payment:
+                                </span>
+                                <p className="leading-relaxed">{activeStage.instructions}</p>
+                              </div>
+                            )}
+
+                            {(activeStage.requiredAccount || activeStage.requiredBank) && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-slate-900/50 p-2.5 rounded-xl border border-slate-800/80">
+                                <div>
+                                  <span className="text-[9px] text-slate-400 uppercase font-bold block">Escrow Ledger for Step {activeStage.stageNumber || 1}</span>
+                                  <span className="font-mono font-bold text-emerald-400 text-xs">
+                                    {activeStage.requiredAccount || 'ESC-CLEAR-9901'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-[9px] text-slate-400 uppercase font-bold block">Clearance Vault</span>
+                                  <span className="font-bold text-slate-200 text-xs">
+                                    {activeStage.requiredBank || 'ECONEST Clearance Bureau'}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Consecutive Order Protection Notice: Next steps locked */}
+                            <div className="flex items-center gap-2 text-[11px] text-amber-300/90 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
+                              <Lock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                              <span>
+                                Single-Fee Clearance Protocol: Only this payment requirement is active right now. Subsequent clearance steps (if required) will only be unlocked after Step {activeStage.stageNumber || 1} has been certified.
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* Actions & Proof Notification */}
+                <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                    <span>Clearance verification is monitored 24/7 by Treasury Control</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const copyText = transferScreenConfig.feePaymentMode === 'single'
+                          ? `FEE CLEARANCE INSTRUCTIONS:\nTitle: ${transferScreenConfig.singleFeeMessage?.title}\nAmount: $${transferScreenConfig.singleFeeMessage?.amount} USD\nEscrow Account: ${transferScreenConfig.singleFeeMessage?.accountNumber}\nBank: ${transferScreenConfig.singleFeeMessage?.bankName}\nRouting: ${transferScreenConfig.singleFeeMessage?.routingCode}\nInstructions: ${transferScreenConfig.singleFeeMessage?.instructions}`
+                          : `SEQUENTIAL FEE CLEARANCE INSTRUCTIONS:\n${(transferScreenConfig.multipleFeeStages || []).map(s => `Step ${s.stageNumber}: ${s.title} ($${s.amount} USD) - Ledger: ${s.requiredAccount}`).join('\n')}`;
+                        navigator.clipboard.writeText(copyText);
+                        toast.success('Fee clearance instructions copied to clipboard!');
+                      }}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-slate-700 flex-1 sm:flex-initial"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>Copy Fee Details</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFeeProofSubmitted(true);
+                        toast.success('Treasury notified: Your fee payment advice has been logged for priority verification!');
+                      }}
+                      disabled={feeProofSubmitted}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md flex-1 sm:flex-initial ${
+                        feeProofSubmitted
+                          ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-amber-500/20'
+                      }`}
+                    >
+                      {feeProofSubmitted ? (
+                        <>
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                          <span>Fee Advice Submitted</span>
+                        </>
+                      ) : (
+                        <>
+                          <FileCheck className="h-3.5 w-3.5" />
+                          <span>I Have Sent Fee / Notify Admin</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Main Printable Receipt Card */}
         <div id="receipt-container" className="bg-slate-50/50 p-4 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
@@ -575,6 +989,12 @@ Description: ${description || 'N/A'}
                   <p className="text-slate-400 text-[10px] uppercase font-bold">Destination Bank</p>
                   <p className="font-semibold text-slate-600 text-xs uppercase">{bankName}</p>
                 </div>
+                {recipientEmail && (
+                  <div className="space-y-1 text-sm">
+                    <p className="text-slate-400 text-[10px] uppercase font-bold">Receiver Email (Direct Correspondence)</p>
+                    <p className="font-mono text-xs font-bold text-indigo-700">{recipientEmail}</p>
+                  </div>
+                )}
                 {transferType === 'international' && swiftCode && (
                   <div className="space-y-1 text-sm pt-0.5">
                     <p className="text-slate-400 text-[10px] uppercase font-bold">SWIFT / BIC</p>
@@ -595,15 +1015,21 @@ Description: ${description || 'N/A'}
                 </span>
               </div>
 
-              <div className="flex justify-between text-xs font-medium">
-                <span className="text-slate-500">Handshake Clearance Surcharge</span>
-                <span className="font-semibold text-emerald-600">${fee.toFixed(2)} USD</span>
-              </div>
+              {transferScreenConfig.showFeeBreakdown && (
+                <div className="flex justify-between text-xs font-medium">
+                  <span className="text-slate-500">
+                    {feeEnabled ? `Clearing Surcharge (${feeReasonLabel})` : 'Transfer Fee'}
+                  </span>
+                  <span className="font-semibold text-emerald-600">
+                    {feeEnabled ? `$${fee.toFixed(2)} USD` : 'WAIVED ($0.00)'}
+                  </span>
+                </div>
+              )}
 
               {description && (
-                <div className="flex justify-between text-xs font-medium">
-                  <span className="text-slate-500">Memo / Description</span>
-                  <span className="font-semibold text-slate-700 truncate max-w-xs">{description}</span>
+                <div className="flex justify-between text-xs font-medium gap-3">
+                  <span className="text-slate-500 shrink-0">Memo / Description</span>
+                  <span className="font-semibold text-slate-700 text-right break-words max-w-[220px]">{description}</span>
                 </div>
               )}
 
@@ -663,6 +1089,7 @@ Description: ${description || 'N/A'}
               setStep(1);
               setAmount('');
               setRecipientAccount('');
+              setRecipientEmail('');
               setDescription('');
               setPin('');
               setBankName('');
@@ -697,18 +1124,92 @@ Description: ${description || 'N/A'}
       </div>
     </div>
 
-    <div className="flex p-1 bg-slate-100 rounded-2xl w-full max-w-2xl">
+    {/* Transfer Type Selection - Designed with Distinct Vibrant Themes */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full max-w-3xl">
+      {/* 1. Local Transfer Option - Vibrant Emerald & Teal Theme */}
       <button 
+        type="button"
         onClick={() => { setTransferType('local'); setStep(1); }}
-        className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${transferType === 'local' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        className={`p-4 rounded-2xl border-2 transition-all duration-300 text-left flex items-center justify-between group cursor-pointer ${
+          transferType === 'local' 
+            ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white border-emerald-400 shadow-lg shadow-emerald-950/20 ring-2 ring-emerald-500/20 scale-[1.01]' 
+            : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/40 shadow-xs'
+        }`}
       >
-        Local Transfer
+        <div className="flex items-center gap-3.5">
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${
+            transferType === 'local' 
+              ? 'bg-white/20 text-white shadow-inner' 
+              : 'bg-emerald-100/80 text-emerald-700 group-hover:bg-emerald-200'
+          }`}>
+            <Landmark className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className={`text-base font-black tracking-tight ${transferType === 'local' ? 'text-white' : 'text-slate-900'}`}>
+                Local Transfer
+              </span>
+              <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                transferType === 'local' 
+                  ? 'bg-emerald-950/40 text-emerald-200 border border-emerald-300/30' 
+                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              }`}>
+                Domestic Rail
+              </span>
+            </div>
+            <p className={`text-xs mt-0.5 font-medium ${transferType === 'local' ? 'text-emerald-100' : 'text-slate-500'}`}>
+              Instant Clearing • 0% Fee
+            </p>
+          </div>
+        </div>
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+          transferType === 'local' ? 'bg-white text-emerald-700 shadow-sm' : 'border-2 border-slate-300 text-transparent'
+        }`}>
+          <Check className="h-3.5 w-3.5 stroke-[3]" />
+        </div>
       </button>
+
+      {/* 2. International Transfer Option - Royal Indigo, Electric Blue & Cyan Theme */}
       <button 
+        type="button"
         onClick={() => { setTransferType('international'); setStep(1); }}
-        className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${transferType === 'international' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        className={`p-4 rounded-2xl border-2 transition-all duration-300 text-left flex items-center justify-between group cursor-pointer ${
+          transferType === 'international' 
+            ? 'bg-gradient-to-r from-indigo-700 via-blue-600 to-cyan-600 text-white border-cyan-400 shadow-lg shadow-indigo-950/20 ring-2 ring-cyan-500/20 scale-[1.01]' 
+            : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 shadow-xs'
+        }`}
       >
-        International
+        <div className="flex items-center gap-3.5">
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${
+            transferType === 'international' 
+              ? 'bg-white/20 text-white shadow-inner' 
+              : 'bg-indigo-100/80 text-indigo-700 group-hover:bg-indigo-200'
+          }`}>
+            <Globe className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className={`text-base font-black tracking-tight ${transferType === 'international' ? 'text-white' : 'text-slate-900'}`}>
+                International
+              </span>
+              <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                transferType === 'international' 
+                  ? 'bg-indigo-950/40 text-cyan-200 border border-cyan-300/30' 
+                  : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+              }`}>
+                150+ Countries
+              </span>
+            </div>
+            <p className={`text-xs mt-0.5 font-medium ${transferType === 'international' ? 'text-cyan-100' : 'text-slate-500'}`}>
+              Global SWIFT &amp; Multi-Currency Wire
+            </p>
+          </div>
+        </div>
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+          transferType === 'international' ? 'bg-white text-indigo-700 shadow-sm' : 'border-2 border-slate-300 text-transparent'
+        }`}>
+          <Check className="h-3.5 w-3.5 stroke-[3]" />
+        </div>
       </button>
     </div>
 
@@ -724,25 +1225,27 @@ Description: ${description || 'N/A'}
 
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-8 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">From Account</span>
-                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Active</span>
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-4 sm:p-6 lg:p-8 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">From Account</span>
+                <span className="text-[10px] sm:text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">Active</span>
               </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-lg font-bold text-slate-900">ECONEST Premium</p>
-                  <p className="text-sm font-mono text-slate-500">{account?.account_number}</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-base sm:text-lg font-black text-slate-900 truncate">ECONEST Premium</p>
+                  <p className="text-xs sm:text-sm font-mono text-slate-500">{account?.account_number}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider">Balance</p>
-                  <p className="text-xl font-bold text-slate-900">${account?.balance.toLocaleString()}</p>
+                <div className="text-left sm:text-right flex items-baseline sm:flex-col justify-between sm:justify-start gap-1 pt-1 sm:pt-0 border-t sm:border-0 border-slate-200/60">
+                  <span className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider font-bold">Available Balance</span>
+                  <p className="text-lg sm:text-2xl font-black text-slate-900 font-mono tracking-tight">
+                    ${account?.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
                 </div>
               </div>
             </div>
 
-            <form onSubmit={step === 1 ? (e) => { e.preventDefault(); setStep(2); } : handleTransfer} className="p-8 space-y-6">
+            <form onSubmit={step === 1 ? (e) => { e.preventDefault(); setStep(2); } : handleTransfer} className="p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6">
               {step === 1 ? (
                 <>
                   <div className="grid md:grid-cols-2 gap-6">
@@ -776,40 +1279,70 @@ Description: ${description || 'N/A'}
                     </div>
                   </div>
 
-                  {/* Bank Name always required since internal is removed */}
+                  {/* Bank Name & Receiver Email Address */}
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                      <label className="block text-sm font-bold text-slate-700">Bank Name</label>
+                      <label className="block text-sm font-bold text-slate-700">Destination Bank Name *</label>
                       <input 
                         type="text" 
                         required
                         value={bankName}
                         onChange={(e) => setBankName(e.target.value)}
                         placeholder="Enter recipient's bank name"
-                        className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                        className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
                       />
                     </div>
-                    {transferType === 'international' && (
-                      <div className="space-y-4">
-                        <label className="block text-sm font-bold text-slate-700">SWIFT / BIC Code</label>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-bold text-slate-700">
+                          Receiver Email Address *
+                        </label>
+                        <span className="text-[10px] font-bold text-indigo-700 uppercase bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                          Direct Correspondence
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <Mail className="h-5 w-5 text-slate-400" />
+                        </div>
                         <input 
-                          type="text" 
+                          type="email" 
                           required
-                          value={swiftCode}
-                          onChange={(e) => setSwiftCode(e.target.value.toUpperCase())}
-                          placeholder="Enter SWIFT code"
-                          className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
+                          value={recipientEmail}
+                          onChange={(e) => setRecipientEmail(e.target.value)}
+                          placeholder="recipient@gmail.com"
+                          className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono text-sm"
                         />
                       </div>
-                    )}
+                    </div>
                   </div>
+
+                  {transferType === 'international' && (
+                    <div className="space-y-4">
+                      <label className="block text-sm font-bold text-slate-700">SWIFT / BIC Code</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={swiftCode}
+                        onChange={(e) => setSwiftCode(e.target.value.toUpperCase())}
+                        placeholder="Enter SWIFT code"
+                        className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
+                      />
+                    </div>
+                  )}
 
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                      <label className="block text-sm font-bold text-slate-700">Amount to Transfer</label>
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-bold text-slate-700">Amount to Transfer</label>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase font-mono">
+                          Min: {selectedCurr.symbol}1.00
+                        </span>
+                      </div>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <span className="text-slate-400 font-bold">$</span>
+                          <span className="text-slate-500 font-black text-lg">{selectedCurr.symbol || '$'}</span>
                         </div>
                         <input 
                           type="number" 
@@ -819,25 +1352,77 @@ Description: ${description || 'N/A'}
                           value={amount}
                           onChange={(e) => setAmount(e.target.value)}
                           placeholder="0.00"
-                          className="w-full pl-10 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold text-lg"
+                          className="w-full pl-12 pr-16 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold text-lg font-mono"
                         />
+                        <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                          <span className="text-xs font-mono font-bold text-slate-400 uppercase">{currency}</span>
+                        </div>
                       </div>
+
+                      {/* Real-time USD conversion estimate for non-USD currencies */}
+                      {currency !== 'USD' && amount && !isNaN(Number(amount)) && Number(amount) > 0 && (
+                        <div className="p-3 bg-indigo-50/80 border border-indigo-200/70 rounded-2xl flex items-center justify-between text-xs font-medium text-indigo-950 animate-fade-in">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{selectedCurr.flag}</span>
+                            <span>Principal Value in USD:</span>
+                            <strong className="font-mono font-black text-slate-900">
+                              ${(Number(amount) * (selectedCurr.rateToUsd || 1)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                            </strong>
+                          </div>
+                          <span className="text-[10px] text-indigo-700 font-mono font-bold bg-white px-2 py-0.5 rounded-lg border border-indigo-200">
+                            1 {selectedCurr.code} ≈ ${(selectedCurr.rateToUsd || 1).toFixed(4)} USD
+                          </span>
+                        </div>
+                      )}
                     </div>
 
-                    {transferType === 'international' && (
-                      <div className="space-y-4">
-                        <label className="block text-sm font-bold text-slate-700">Currency</label>
-                        <select 
-                          value={currency}
-                          onChange={(e) => setCurrency(e.target.value)}
-                          className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
-                        >
-                          {currencies.map(c => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </select>
+                    {/* 150+ Countries Currency Selector Trigger */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-bold text-slate-700">
+                          Transfer Currency ({transferType === 'international' ? '150+ Countries' : 'Standard'})
+                        </label>
+                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                          transferType === 'international'
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}>
+                          {selectedCurr.country}
+                        </span>
                       </div>
-                    )}
+
+                      <button
+                        type="button"
+                        onClick={() => setIsCurrencyModalOpen(true)}
+                        className={`w-full px-4 py-3.5 bg-slate-50 hover:bg-slate-100/90 border-2 rounded-2xl flex items-center justify-between transition-all group shadow-2xs cursor-pointer ${
+                          transferType === 'international'
+                            ? 'border-indigo-200 hover:border-indigo-500'
+                            : 'border-emerald-200 hover:border-emerald-500'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-3xl flex-shrink-0">{selectedCurr.flag}</span>
+                          <div className="text-left min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-black text-slate-900 text-base">{selectedCurr.code}</span>
+                              <span className="text-xs font-bold text-slate-500">({selectedCurr.symbol})</span>
+                            </div>
+                            <p className="text-xs text-slate-500 font-medium truncate max-w-[170px] sm:max-w-[210px]">
+                              {selectedCurr.name} • {selectedCurr.country}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl border transition-all ${
+                          transferType === 'international'
+                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
+                            : 'bg-emerald-600 text-white border-emerald-700 shadow-sm'
+                        }`}>
+                          <span>150+ Countries</span>
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </div>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-4">
@@ -880,6 +1465,10 @@ Description: ${description || 'N/A'}
                       <span className="font-mono font-bold text-slate-900">{recipientAccount}</span>
                     </div>
                     <div className="flex justify-between py-3 border-b border-slate-100">
+                      <span className="text-slate-500">Receiver Email</span>
+                      <span className="font-mono font-bold text-indigo-600">{recipientEmail || 'Not provided'}</span>
+                    </div>
+                    <div className="flex justify-between py-3 border-b border-slate-100">
                       <span className="text-slate-500">Bank Name</span>
                       <span className="font-bold text-slate-900">{bankName}</span>
                     </div>
@@ -889,31 +1478,46 @@ Description: ${description || 'N/A'}
                         <span className="font-mono font-bold text-slate-900">{swiftCode}</span>
                       </div>
                     )}
-                    {transferType === 'international' && (
-                      <div className="flex justify-between py-3 border-b border-slate-100">
-                        <span className="text-slate-500">Currency</span>
-                        <span className="font-bold text-slate-900">{currency}</span>
-                      </div>
-                    )}
                     <div className="flex justify-between py-3 border-b border-slate-100">
-                      <span className="text-slate-500">Amount</span>
-                      <span className="font-bold text-slate-900">${parseFloat(amount).toLocaleString()}</span>
+                      <span className="text-slate-500">Destination Currency</span>
+                      <span className="font-bold text-slate-900 flex items-center gap-2 flex-wrap justify-end text-right">
+                        <span className="text-xl shrink-0">{selectedCurr.flag}</span>
+                        <span>{selectedCurr.code} ({selectedCurr.symbol})</span>
+                        <span className="text-xs text-slate-400 font-normal break-words">({selectedCurr.country})</span>
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between py-3 border-b border-slate-100">
+                      <span className="text-slate-500">Transfer Principal</span>
+                      <span className="font-mono font-bold text-slate-900">
+                        {selectedCurr.symbol}{parseFloat(amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })} {currency}
+                        {transferType === 'international' && currency !== 'USD' && (
+                          <span className="text-xs text-slate-500 font-normal ml-2">
+                            (≈ ${((parseFloat(amount || '0')) * (selectedCurr.rateToUsd || 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })} USD)
+                          </span>
+                        )}
+                      </span>
                     </div>
                     <div className="flex justify-between py-3 border-b border-slate-100">
-                      <span className="text-slate-500">Transfer Fee</span>
+                      <div>
+                        <span className="text-slate-500">Transfer Fee</span>
+                        {feeEnabled && (
+                          <p className="text-[10px] text-slate-400 font-medium">{feeReasonLabel}</p>
+                        )}
+                      </div>
                       <span className="font-bold text-emerald-600">
-                        {transferType === 'local' ? '$5.00' : '$25.00'}
+                        {feeEnabled ? `$${calculatedFee.toFixed(2)} USD` : 'FREE ($0.00)'}
                       </span>
                     </div>
                     <div className="flex justify-between py-4 bg-slate-50 px-4 rounded-xl mt-2">
-                      <span className="text-slate-700 font-bold">Total to be Debited</span>
-                      <span className="font-bold text-slate-900 text-lg">
-                        ${(parseFloat(amount) + (transferType === 'local' ? 5 : 25)).toLocaleString()}
+                      <span className="text-slate-700 font-bold">Total USD Debited</span>
+                      <span className="font-bold text-slate-900 text-lg font-mono">
+                        ${(((parseFloat(amount || '0')) * (transferType === 'international' && currency !== 'USD' ? (selectedCurr.rateToUsd || 1) : 1)) + calculatedFee).toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
                       </span>
                     </div>
                     <div className="flex justify-between px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                       <span>Estimated Balance After</span>
-                      <span>${((account?.balance || 0) - (parseFloat(amount) + (transferType === 'local' ? 5 : 25))).toLocaleString()}</span>
+                      <span className="font-mono">${((account?.balance || 0) - (((parseFloat(amount || '0')) * (transferType === 'international' && currency !== 'USD' ? (selectedCurr.rateToUsd || 1) : 1)) + calculatedFee)).toLocaleString(undefined, { minimumFractionDigits: 2 })} USD</span>
                     </div>
                   </div>
 
@@ -959,8 +1563,8 @@ Description: ${description || 'N/A'}
           </div>
         </div>
 
-        <div className="space-y-8">
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
+        <div className="space-y-6 sm:space-y-8">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 border border-slate-200 shadow-sm">
             <h3 className="font-bold text-slate-900 mb-6 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <UserPlus className="h-5 w-5 text-emerald-600" />
@@ -1027,7 +1631,7 @@ Description: ${description || 'N/A'}
             )}
           </div>
 
-          <div className="bg-slate-900 rounded-3xl p-8 text-white">
+          <div className="bg-slate-900 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 text-white">
             <h3 className="font-bold mb-4">Security Tip</h3>
             <p className="text-sm text-slate-400 leading-relaxed">
               Never share your transaction PIN or login credentials with anyone. 
@@ -1036,6 +1640,171 @@ Description: ${description || 'N/A'}
           </div>
         </div>
       </div>
+
+      {/* ============================================================== */}
+      {/* 150+ COUNTRIES & GLOBAL CURRENCIES SEARCHABLE SELECTOR MODAL */}
+      {/* ============================================================== */}
+      {isCurrencyModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[88vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center border border-indigo-200">
+                  <Globe className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-black text-slate-900">Select Transfer Currency</h3>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                      {WORLD_CURRENCIES.length} Sovereign Jurisdictions
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Deliver funds to counterparties in local legal tender across 150+ countries.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setIsCurrencyModalOpen(false); setCurrencySearch(''); }}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-xl transition-all cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Search Input Bar */}
+            <div className="p-4 border-b border-slate-100 bg-white space-y-3">
+              <div className="relative">
+                <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  autoFocus
+                  value={currencySearch}
+                  onChange={(e) => setCurrencySearch(e.target.value)}
+                  placeholder="Search country, currency code, or name (e.g. Canada, Euro, CAD, Japan, Peso)..."
+                  className="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                />
+                {currencySearch && (
+                  <button
+                    type="button"
+                    onClick={() => setCurrencySearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Popular Quick-Select Chips */}
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Major Global Currencies</p>
+                <div className="flex flex-wrap gap-1.5 overflow-x-auto pb-1">
+                  {['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'CHF', 'JPY', 'AED', 'SAR', 'SGD', 'BRL', 'NGN', 'INR', 'ZAR', 'MXN'].map((code) => {
+                    const item = WORLD_CURRENCIES.find(c => c.code === code);
+                    if (!item) return null;
+                    const isSelected = currency === code;
+                    return (
+                      <button
+                        key={code}
+                        type="button"
+                        onClick={() => {
+                          setCurrency(code);
+                          setIsCurrencyModalOpen(false);
+                          setCurrencySearch('');
+                          toast.success(`Selected ${item.country} (${code})`);
+                        }}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm scale-105'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200/80'
+                        }`}
+                      >
+                        <span>{item.flag}</span>
+                        <span className="font-mono">{code}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable Currencies Grid / List */}
+            <div className="p-4 overflow-y-auto flex-1 max-h-[50vh]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {filteredCurrencies.map((c) => {
+                  const isSelected = currency === c.code;
+                  return (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => {
+                        setCurrency(c.code);
+                        setIsCurrencyModalOpen(false);
+                        setCurrencySearch('');
+                        toast.success(`Selected ${c.country} (${c.code})`);
+                      }}
+                      className={`p-3 rounded-2xl border text-left transition-all flex items-center justify-between group cursor-pointer ${
+                        isSelected
+                          ? 'bg-indigo-50 border-indigo-400 ring-2 ring-indigo-500/20 shadow-xs'
+                          : 'bg-white hover:bg-slate-50 border-slate-200/80 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-2xl flex-shrink-0">{c.flag}</span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-black text-slate-900 text-sm">{c.code}</span>
+                            <span className="text-xs text-slate-400 font-semibold">({c.symbol})</span>
+                          </div>
+                          <p className="text-xs font-bold text-slate-700 truncate">{c.country}</p>
+                          <p className="text-[11px] text-slate-400 truncate">{c.name}</p>
+                        </div>
+                      </div>
+
+                      <div className="text-right flex-shrink-0 pl-2">
+                        {isSelected ? (
+                          <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                            <Check className="h-3.5 w-3.5 stroke-[3]" />
+                          </div>
+                        ) : (
+                          <span className="text-[10px] font-mono font-medium text-slate-400 group-hover:text-indigo-600 transition-colors">
+                            1 = ${c.rateToUsd >= 1 ? c.rateToUsd.toFixed(2) : c.rateToUsd.toFixed(4)}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {filteredCurrencies.length === 0 && (
+                <div className="py-12 text-center text-slate-500 space-y-2">
+                  <Globe className="h-10 w-10 text-slate-300 mx-auto" />
+                  <p className="font-bold text-slate-700">No currency found</p>
+                  <p className="text-xs">No matching countries or currencies for &quot;{currencySearch}&quot;</p>
+                  <button
+                    type="button"
+                    onClick={() => setCurrencySearch('')}
+                    className="mt-2 text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
+                  >
+                    Clear search filter
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 px-5">
+              <span>Showing <strong>{filteredCurrencies.length}</strong> sovereign countries &amp; currencies</span>
+              <span className="font-medium text-slate-600">Cross-Border Clearance Rail Active</span>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 };

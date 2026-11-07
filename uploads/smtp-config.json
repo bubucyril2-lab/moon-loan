@@ -1,0 +1,16 @@
+{
+  "host": "smtp.gmail.com",
+  "port": 465,
+  "secure": false,
+  "user": "",
+  "pass": "",
+  "fromName": "ECONEST BANK Alert Desk",
+  "fromEmail": "notifications@econestbank.com",
+  "adminAlertEmail": "bubucyril2@gmail.com",
+  "enabled": true,
+  "autoDispatchEnabled": true,
+  "autoSendTransferReceipt": true,
+  "autoSendWelcomeEmail": true,
+  "autoSendAdminTransferAlert": true,
+  "autoSendChatNotification": true
+}

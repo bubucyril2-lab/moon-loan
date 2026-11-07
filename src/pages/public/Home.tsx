@@ -1,17 +1,118 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Shield, Zap, Globe, ArrowRight, CheckCircle2, Landmark, Wifi, RotateCw, HelpCircle, CreditCard, Lock, Unlock, TrendingUp, Coins, Sparkles, Activity } from 'lucide-react';
+import { Shield, ShieldCheck, Zap, Globe, ArrowRight, CheckCircle2, Landmark, Wifi, RotateCw, HelpCircle, CreditCard, Lock, Unlock, TrendingUp, Coins, Sparkles, Activity } from 'lucide-react';
 import PublicNavbar from '../../components/layout/PublicNavbar';
 import { motion } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import TradingChart from '../../components/TradingChart';
+
 // @ts-ignore
 import bankHqBg from '../../assets/images/econest_bank_hq_1782508914035.jpg';
+// @ts-ignore
+import bankersGroupImg from '../../assets/images/bankers_group_1793450954338.jpg';
+
+// 5 Distinct Luxury ATM Card Designs for Hero Showcase
+interface HeroAtmDesign {
+  id: string;
+  name: string;
+  tier: string;
+  bgGradient: string;
+  borderColor: string;
+  accentColor: string;
+  chipGradient: string;
+  cardNumber: string;
+  network: 'mastercard' | 'visa' | 'unionpay';
+  balance: string;
+  currency: string;
+  cardholder: string;
+}
+
+const HERO_ATM_DESIGNS: HeroAtmDesign[] = [
+  {
+    id: 'emerald',
+    name: 'Emerald Titanium',
+    tier: 'WORLD ELITE',
+    bgGradient: 'from-[#022c22] via-[#064e3b] to-[#047857]',
+    borderColor: 'border-emerald-400/40',
+    accentColor: 'text-emerald-400',
+    chipGradient: 'from-amber-200 via-yellow-400 to-amber-300',
+    cardNumber: '•••• •••• •••• 9234',
+    network: 'mastercard',
+    balance: '$312,190.00',
+    currency: 'USD',
+    cardholder: 'ELIZABETH ZAKS'
+  },
+  {
+    id: 'gold',
+    name: 'Imperial Gold Reserve',
+    tier: 'EXECUTIVE PREMIER',
+    bgGradient: 'from-[#451a03] via-[#78350f] to-[#b45309]',
+    borderColor: 'border-amber-400/40',
+    accentColor: 'text-amber-300',
+    chipGradient: 'from-slate-100 via-amber-300 to-yellow-200',
+    cardNumber: '•••• •••• •••• 5812',
+    network: 'visa',
+    balance: '$440,207.85',
+    currency: 'USD',
+    cardholder: 'ELIZABETH ZAKS'
+  },
+  {
+    id: 'sapphire',
+    name: 'Infinite Sapphire',
+    tier: 'PRIVATE CUSTODY',
+    bgGradient: 'from-[#08152e] via-[#0f2854] to-[#1d4ed8]',
+    borderColor: 'border-blue-400/40',
+    accentColor: 'text-sky-300',
+    chipGradient: 'from-yellow-200 via-blue-300 to-amber-300',
+    cardNumber: '•••• •••• •••• 7029',
+    network: 'unionpay',
+    balance: '€285,450.00',
+    currency: 'EUR',
+    cardholder: 'ELIZABETH ZAKS'
+  },
+  {
+    id: 'obsidian',
+    name: 'Obsidian Centurion',
+    tier: 'SOVEREIGN BLACK',
+    bgGradient: 'from-[#09090b] via-[#18181b] to-[#27272a]',
+    borderColor: 'border-slate-500/40',
+    accentColor: 'text-slate-300',
+    chipGradient: 'from-amber-100 via-yellow-400 to-amber-500',
+    cardNumber: '•••• •••• •••• 8501',
+    network: 'mastercard',
+    balance: '$850,000.00',
+    currency: 'USD',
+    cardholder: 'ELIZABETH ZAKS'
+  },
+  {
+    id: 'ruby',
+    name: 'Signature Ruby',
+    tier: 'GENEVA WEALTH',
+    bgGradient: 'from-[#4c0519] via-[#881337] to-[#be123c]',
+    borderColor: 'border-rose-400/40',
+    accentColor: 'text-rose-300',
+    chipGradient: 'from-rose-200 via-amber-300 to-rose-300',
+    cardNumber: '•••• •••• •••• 4190',
+    network: 'visa',
+    balance: '£340,920.00',
+    currency: 'GBP',
+    cardholder: 'ELIZABETH ZAKS'
+  }
+];
 
 const Home = () => {
   const [flippedCards, setFlippedCards] = useState<Record<number, boolean>>({});
   const [isChartLocked, setIsChartLocked] = useState(true);
+  const [activeAtmIndex, setActiveAtmIndex] = useState(0);
+
+  // Auto-cycle through the 5 distinct ATM card designs every 4 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveAtmIndex(prev => (prev + 1) % HERO_ATM_DESIGNS.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
 
   const toggleCard = (index: number) => {
     setFlippedCards(prev => ({
@@ -19,48 +120,151 @@ const Home = () => {
       [index]: !prev[index]
     }));
   };
+
+  const currentAtm = HERO_ATM_DESIGNS[activeAtmIndex];
+
   return (
     <div className="min-h-screen">
       <PublicNavbar />
       
-      {/* Hero Section */}
-      <section className="relative min-h-[85vh] flex items-end overflow-hidden">
-        {/* Background Image with Overlay */}
+      {/* Hero Section: Reduced size by 50% with clean background & floating 4s ATM card inside */}
+      <section className="relative h-[42vh] sm:h-[48vh] min-h-[350px] max-h-[460px] overflow-hidden select-none">
+        {/* Background Photo of the 4 Advisory Bankers - 100% visible and sharp */}
         <div className="absolute inset-0 z-0">
           <img 
-            src={bankHqBg} 
-            alt="Hero Background" 
-            className="w-full h-full object-cover object-center"
+            src="/assets/aistudio/Group-of-Four-People-Looking-At-Laptop_108c4633.png" 
+            alt="ECONEST Banking Advisory Team" 
+            className="w-full h-full object-cover object-[center_18%]"
             referrerPolicy="no-referrer"
           />
-          {/* Multi-layered gradient overlay: darker on the bottom to protect text contrast, lighter on top to reveal the gorgeous bank signage */}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/50 to-slate-900/25 backdrop-blur-[0.5px]"></div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-48 pb-16 sm:pb-20 w-full">
-          <div className="max-w-3xl">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight mb-6">
-                Banking for the <span className="text-emerald-400">Next Generation</span>
-              </h1>
-              <p className="text-xl text-slate-200 mb-8 leading-relaxed max-w-2xl">
-                Experience secure, transparent, and lightning-fast digital banking. 
-                Manage your wealth with ECONEST BANK's advanced financial tools.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Link to="/register" className="bg-emerald-500 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-emerald-600 transition-all shadow-lg flex items-center justify-center gap-2 group">
-                  Get Started Now
-                  <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <Link to="/about" className="bg-white/10 backdrop-blur-md text-white border border-white/20 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-white/20 transition-all text-center">
-                  Learn More
-                </Link>
+        {/* 5 Different ATM Card Designs - Floating at bottom-right over table, NEVER blocking the bankers' faces */}
+        <div className="absolute bottom-3 right-3 sm:bottom-4 sm:right-6 z-20 flex flex-col items-end">
+          <motion.div
+            key={currentAtm.id}
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            className={`w-[235px] sm:w-[265px] aspect-[1.586/1] rounded-2xl p-3 sm:p-3.5 bg-gradient-to-tr ${currentAtm.bgGradient} border ${currentAtm.borderColor} text-white shadow-2xl shadow-black/60 relative overflow-hidden flex flex-col justify-between backdrop-blur-xs ring-1 ring-white/10`}
+          >
+            {/* Hologram security ripple pattern */}
+            <div className="absolute inset-0 opacity-[0.08] pointer-events-none mix-blend-overlay">
+              <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <circle cx="20" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="0.5" />
+                <circle cx="80" cy="50" r="35" fill="none" stroke="currentColor" strokeWidth="0.5" />
+              </svg>
+            </div>
+
+            {/* Top row: Brand & Tier Badge */}
+            <div className="relative z-10 flex justify-between items-start">
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-4 bg-white/15 rounded flex items-center justify-center border border-white/20">
+                  <Landmark className="h-2.5 w-2.5 text-white" />
+                </div>
+                <div>
+                  <span className="font-sans font-black tracking-[0.16em] text-[11px] text-white leading-none">ECONEST</span>
+                  <span className={`text-[6.5px] font-bold ${currentAtm.accentColor} tracking-[0.05em] ml-1 uppercase`}>
+                    {currentAtm.tier}
+                  </span>
+                </div>
               </div>
-            </motion.div>
+
+              <div className="flex items-center gap-1">
+                <span className="text-[7px] font-mono font-bold text-white/70 uppercase tracking-wider">{currentAtm.name}</span>
+                <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center">
+                  <ShieldCheck className="h-2.5 w-2.5 text-white/90" />
+                </div>
+              </div>
+            </div>
+
+            {/* Chip & Contactless */}
+            <div className="relative z-10 flex items-center justify-between my-0.5">
+              {/* EMV Micro-Chip */}
+              <div className={`w-[28px] h-[20px] rounded bg-gradient-to-br ${currentAtm.chipGradient} relative border border-amber-600/40 overflow-hidden shadow-xs`}>
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[0.5px] bg-yellow-900/40"></div>
+                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[0.5px] bg-yellow-900/40"></div>
+                <div className="absolute inset-[2px] border border-yellow-800/20 rounded-[1px]"></div>
+              </div>
+
+              {/* Wi-Fi Contactless Symbol */}
+              <div className="flex items-center gap-0.5 opacity-80">
+                <Wifi className="h-3 w-3 text-white/70 rotate-90" />
+              </div>
+            </div>
+
+            {/* Card Number */}
+            <div className="relative z-10">
+              <p className="font-mono text-xs sm:text-[13px] tracking-[0.14em] text-white font-black drop-shadow-sm">
+                {currentAtm.cardNumber}
+              </p>
+            </div>
+
+            {/* Bottom Row: Cardholder & Available Balance */}
+            <div className="relative z-10 flex justify-between items-end pt-1 border-t border-white/15">
+              <div>
+                <p className="text-[5.5px] text-white/50 uppercase tracking-widest font-black leading-none">Cardholder</p>
+                <p className="text-[9px] font-bold tracking-wider text-slate-100 uppercase truncate max-w-[100px] mt-0.5">
+                  {currentAtm.cardholder}
+                </p>
+              </div>
+
+              <div className="text-right">
+                <p className="text-[5.5px] text-white/50 uppercase tracking-widest font-black leading-none">Available Balance</p>
+                <p className="text-[11px] sm:text-xs font-mono font-black text-white mt-0.5">
+                  {currentAtm.balance}{' '}
+                  <span className="text-[7px] font-sans font-bold text-white/60">{currentAtm.currency}</span>
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* 4-Second Rotation Dots Indicator - Compact & Elegant (No Ugly Pill) */}
+          <div className="flex items-center gap-1.5 mt-2 bg-slate-950/70 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 shadow-md">
+            {HERO_ATM_DESIGNS.map((item, idx) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveAtmIndex(idx)}
+                className={`transition-all duration-300 cursor-pointer ${
+                  activeAtmIndex === idx 
+                    ? 'w-4 h-1.5 bg-emerald-400 rounded-full' 
+                    : 'w-1.5 h-1.5 bg-white/30 hover:bg-white/70 rounded-full'
+                }`}
+                title={`ATM Card: ${item.name} (${idx + 1}/5)`}
+                aria-label={`View ${item.name}`}
+              />
+            ))}
+            <span className="text-[8px] font-mono text-slate-300 font-bold ml-1 uppercase">
+              {activeAtmIndex + 1}/5 • 4s
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* Clean Quick-Access Action Strip (Located completely below the photo background) */}
+      <section className="bg-slate-900 border-t border-slate-800 py-4 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <p className="text-xs sm:text-sm font-bold text-white tracking-wide">
+              ECONEST Global Private Wealth • Next-Generation Digital Banking
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link 
+              to="/register" 
+              className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black px-5 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5"
+            >
+              <span>Get Started Now</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link 
+              to="/about" 
+              className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider border border-slate-700 transition-all"
+            >
+              Learn More
+            </Link>
           </div>
         </div>
       </section>
@@ -211,9 +415,9 @@ const Home = () => {
           <div className="lg:grid lg:grid-cols-2 lg:gap-16 items-center">
             <div className="order-2 lg:order-1">
               <img 
-                src="https://picsum.photos/seed/finance/800/600" 
-                alt="Financial Services" 
-                className="rounded-3xl shadow-xl"
+                src={bankersGroupImg} 
+                alt="ECONEST Executive Banking Team" 
+                className="rounded-3xl shadow-2xl border border-slate-200/80 w-full object-cover aspect-[4/3]"
                 referrerPolicy="no-referrer"
               />
             </div>

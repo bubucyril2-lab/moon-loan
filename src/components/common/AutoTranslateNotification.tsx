@@ -43,6 +43,14 @@ const AutoTranslateNotification: React.FC<AutoTranslateNotificationProps> = ({ o
 
   if (!isVisible || !detection) return null;
 
+  // Ensure translation notification is never visible inside user dashboard or admin
+  if (typeof window !== 'undefined') {
+    const currentPath = window.location.pathname;
+    if (currentPath.startsWith('/dashboard') || currentPath.startsWith('/admin')) {
+      return null;
+    }
+  }
+
   const handleKeep = () => {
     markAutoNotified();
     setIsVisible(false);

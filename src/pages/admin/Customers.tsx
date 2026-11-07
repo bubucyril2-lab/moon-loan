@@ -555,166 +555,312 @@ const AdminCustomers = () => {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Customer</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Account Info</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Balance</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">PIN</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
-                  </td>
-                </tr>
-              ) : filteredCustomers.map((customer) => (
-                <tr key={customer.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
-                        <User className="h-5 w-5 text-slate-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-900">{customer.full_name}</p>
-                        <p className="text-xs text-slate-500 flex items-center gap-1">
-                          <Mail className="h-3 w-3" /> {customer.email}
-                        </p>
-                      </div>
+        {/* Loading State */}
+        {isLoading && (
+          <div className="px-6 py-16 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-2" />
+            <p className="text-xs text-slate-400">Loading customers...</p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && filteredCustomers.length === 0 && (
+          <div className="px-6 py-16 text-center text-slate-500 text-xs">
+            No customers found matching your search.
+          </div>
+        )}
+
+        {/* 1. MOBILE & TABLET RESPONSIVE CARDS (< 1024px, Zero Horizontal Scroll) */}
+        {!isLoading && filteredCustomers.length > 0 && (
+          <div className="divide-y divide-slate-100 lg:hidden">
+            {filteredCustomers.map((customer) => (
+              <div key={customer.id} className="p-4 sm:p-5 space-y-3.5 hover:bg-slate-50/60 transition-colors">
+                {/* Header: Customer Info & Status */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center shrink-0">
+                      <User className="h-5 w-5 text-slate-600" />
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-mono text-slate-600">{customer.account_number || 'N/A'}</p>
-                    <p className="text-[10px] text-slate-400 uppercase font-bold">Savings Account</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-bold text-slate-900">${customer.balance?.toLocaleString() || '0.00'}</p>
-                  </td>
-                  <td className="px-6 py-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-slate-900 break-words">{customer.full_name}</p>
+                      <p className="text-xs text-slate-500 flex items-center gap-1 break-all font-mono mt-0.5">
+                        <Mail className="h-3 w-3 shrink-0" /> {customer.email}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
+                      customer.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
+                      customer.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {customer.status}
+                    </span>
+                    {customer.status !== 'pending' && (
+                      <button 
+                        onClick={() => handleStatusUpdate(customer.id, customer.status === 'active' ? 'disabled' : 'active')}
+                        className={`p-1 rounded-md transition-all ${
+                          customer.status === 'active' 
+                            ? 'text-red-500 hover:bg-red-50' 
+                            : 'text-emerald-500 hover:bg-emerald-50'
+                        }`}
+                        title={customer.status === 'active' ? 'Disable Account' : 'Enable Account'}
+                      >
+                        {customer.status === 'active' ? <XCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Account Details Pill */}
+                <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Account Number</span>
+                    <span className="font-mono font-bold text-slate-700">{customer.account_number || 'N/A'}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Available Balance</span>
+                    <span className="font-bold text-emerald-600 font-mono text-sm">${customer.balance?.toLocaleString() || '0.00'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Transfer PIN</span>
                     {customer.transactionPin ? (
-                      <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold border border-emerald-100 font-mono">
+                      <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 text-[11px]">
                         {customer.transactionPin}
                       </span>
                     ) : (
-                      <span className="text-xs text-slate-400 font-medium italic">Not Set</span>
+                      <span className="text-slate-400 italic text-[11px]">Not Set</span>
                     )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize ${
-                        customer.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
-                        customer.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {customer.status}
-                      </span>
-                      {customer.status !== 'pending' && (
-                        <button 
-                          onClick={() => handleStatusUpdate(customer.id, customer.status === 'active' ? 'disabled' : 'active')}
-                          className={`p-1 rounded-md transition-all ${
-                            customer.status === 'active' 
-                              ? 'text-red-500 hover:bg-red-50' 
-                              : 'text-emerald-500 hover:bg-emerald-50'
-                          }`}
-                          title={customer.status === 'active' ? 'Disable Account' : 'Enable Account'}
-                        >
-                          {customer.status === 'active' ? <XCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Tier</span>
+                    <span className="font-bold text-slate-600 text-[11px]">Savings Standard</span>
+                  </div>
+                </div>
+
+                {/* Responsive Actions Toolbar */}
+                <div className="flex items-center justify-between gap-1 pt-1 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button 
+                      onClick={() => setShowMessageModal(customer)}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 rounded-lg text-xs font-semibold transition-all inline-flex items-center gap-1"
+                      title="Send Notification"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      <span>Message</span>
+                    </button>
+                    <button 
+                      onClick={() => openEditModal(customer)}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-all inline-flex items-center gap-1"
+                      title="Edit Profile"
+                    >
+                      <User className="h-3.5 w-3.5" />
+                      <span>Edit</span>
+                    </button>
+                    {customer.status === 'active' && (
                       <button 
-                        onClick={() => setShowMessageModal(customer)}
-                        className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
-                        title="Send Notification"
+                        onClick={() => setShowAdjustModal(customer)}
+                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-semibold transition-all inline-flex items-center gap-1"
+                        title="Credit/Debit Balance"
                       >
-                        <MessageSquare className="h-5 w-5" />
+                        <DollarSign className="h-3.5 w-3.5" />
+                        <span>Funds</span>
                       </button>
+                    )}
+                    {customer.status === 'active' && (
                       <button 
-                        onClick={() => openEditModal(customer)}
-                        className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
-                        title="Edit Profile"
+                        onClick={() => {
+                          setShowResetPinModal(customer);
+                          setNewPin('');
+                        }}
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-all inline-flex items-center gap-1"
+                        title="Transfer Reset (PIN)"
                       >
-                        <User className="h-5 w-5" />
+                        <RefreshCcw className="h-3.5 w-3.5" />
+                        <span>PIN</span>
                       </button>
-                      {customer.status === 'active' && (
-                        <button 
-                          onClick={() => {
-                            setShowResetPinModal(customer);
-                            setNewPin('');
-                          }}
-                          className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
-                          title="Transfer Reset (PIN)"
-                        >
-                          <RefreshCcw className="h-5 w-5" />
-                        </button>
-                      )}
-                      {customer.status === 'active' && (
-                        <button 
-                          onClick={() => {
-                            setShowResetPasswordModal(customer);
-                            setNewPassword('');
-                          }}
-                          className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
-                          title="Reset Password"
-                        >
-                          <Lock className="h-5 w-5" />
-                        </button>
-                      )}
-                      {customer.status === 'active' && (
-                        <button 
-                          onClick={() => fetchCustomerDetails(customer.id)}
-                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                          title="Manage Account"
-                        >
-                          <ShieldCheck className="h-5 w-5" />
-                        </button>
-                      )}
-                      {customer.status === 'active' && (
-                        <button 
-                          onClick={() => setShowAdjustModal(customer)}
-                          className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
-                          title="Credit/Debit Balance"
-                        >
-                          <DollarSign className="h-5 w-5" />
-                        </button>
-                      )}
-                      {customer.status === 'pending' && (
-                        <button 
-                          onClick={() => handleStatusUpdate(customer.id, 'active')}
-                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                          title="Enable Account (Approve)"
-                        >
-                          <CheckCircle2 className="h-5 w-5" />
-                        </button>
-                      )}
+                    )}
+                    {customer.status === 'active' && (
                       <button 
-                        onClick={() => setShowDeleteConfirm(customer)}
-                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                        title="Delete Account"
+                        onClick={() => {
+                          setShowResetPasswordModal(customer);
+                          setNewPassword('');
+                        }}
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-all inline-flex items-center gap-1"
+                        title="Reset Password"
                       >
-                        <UserMinus className="h-5 w-5" />
+                        <Lock className="h-3.5 w-3.5" />
+                        <span>Pass</span>
                       </button>
-                    </div>
-                  </td>
+                    )}
+                  </div>
+
+                  <button 
+                    onClick={() => setShowDeleteConfirm(customer)}
+                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                    title="Delete Account"
+                  >
+                    <UserMinus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 2. DESKTOP TABLE VIEW (Visible only on lg screens >= 1024px) */}
+        {!isLoading && filteredCustomers.length > 0 && (
+          <div className="hidden lg:block overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Customer</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Account Info</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Balance</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">PIN</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {!isLoading && filteredCustomers.length === 0 && (
-            <div className="px-6 py-12 text-center text-slate-500">
-              No customers found matching your search.
-            </div>
-          )}
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredCustomers.map((customer) => (
+                  <tr key={customer.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
+                          <User className="h-5 w-5 text-slate-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">{customer.full_name}</p>
+                          <p className="text-xs text-slate-500 flex items-center gap-1">
+                            <Mail className="h-3 w-3" /> {customer.email}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-mono text-slate-600">{customer.account_number || 'N/A'}</p>
+                      <p className="text-[10px] text-slate-400 uppercase font-bold">Savings Account</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-bold text-slate-900">${customer.balance?.toLocaleString() || '0.00'}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      {customer.transactionPin ? (
+                        <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold border border-emerald-100 font-mono">
+                          {customer.transactionPin}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-medium italic">Not Set</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize ${
+                          customer.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
+                          customer.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {customer.status}
+                        </span>
+                        {customer.status !== 'pending' && (
+                          <button 
+                            onClick={() => handleStatusUpdate(customer.id, customer.status === 'active' ? 'disabled' : 'active')}
+                            className={`p-1 rounded-md transition-all ${
+                              customer.status === 'active' 
+                                ? 'text-red-500 hover:bg-red-50' 
+                                : 'text-emerald-500 hover:bg-emerald-50'
+                            }`}
+                            title={customer.status === 'active' ? 'Disable Account' : 'Enable Account'}
+                          >
+                            {customer.status === 'active' ? <XCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => setShowMessageModal(customer)}
+                          className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+                          title="Send Notification"
+                        >
+                          <MessageSquare className="h-5 w-5" />
+                        </button>
+                        <button 
+                          onClick={() => openEditModal(customer)}
+                          className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+                          title="Edit Profile"
+                        >
+                          <User className="h-5 w-5" />
+                        </button>
+                        {customer.status === 'active' && (
+                          <button 
+                            onClick={() => {
+                              setShowResetPinModal(customer);
+                              setNewPin('');
+                            }}
+                            className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+                            title="Transfer Reset (PIN)"
+                          >
+                            <RefreshCcw className="h-5 w-5" />
+                          </button>
+                        )}
+                        {customer.status === 'active' && (
+                          <button 
+                            onClick={() => {
+                              setShowResetPasswordModal(customer);
+                              setNewPassword('');
+                            }}
+                            className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+                            title="Reset Password"
+                          >
+                            <Lock className="h-5 w-5" />
+                          </button>
+                        )}
+                        {customer.status === 'active' && (
+                          <button 
+                            onClick={() => fetchCustomerDetails(customer.id)}
+                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            title="Manage Account"
+                          >
+                            <ShieldCheck className="h-5 w-5" />
+                          </button>
+                        )}
+                        {customer.status === 'active' && (
+                          <button 
+                            onClick={() => setShowAdjustModal(customer)}
+                            className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+                            title="Credit/Debit Balance"
+                          >
+                            <DollarSign className="h-5 w-5" />
+                          </button>
+                        )}
+                        {customer.status === 'pending' && (
+                          <button 
+                            onClick={() => handleStatusUpdate(customer.id, 'active')}
+                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            title="Enable Account (Approve)"
+                          >
+                            <CheckCircle2 className="h-5 w-5" />
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => setShowDeleteConfirm(customer)}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Delete Account"
+                        >
+                          <UserMinus className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Customer Details Modal */}

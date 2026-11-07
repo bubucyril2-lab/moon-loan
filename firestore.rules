@@ -196,6 +196,13 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /email_messages/{messageId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid || request.query.filters.userId == request.auth.uid);
+      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.userId || isAdmin());
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
     match /loans/{loanId} {
       allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid || request.query.filters.userId == request.auth.uid);
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;

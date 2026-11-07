@@ -1,5 +1,7 @@
 import React from 'react';
 import PublicNavbar from '../../components/layout/PublicNavbar';
+// @ts-ignore
+import bankersGroupImg from '../../assets/images/bankers_group_1793450954338.jpg';
 
 const About = () => {
   return (
@@ -18,7 +20,12 @@ const About = () => {
               tools to manage your wealth and achieve your financial goals.
             </p>
           </div>
-          <img src="https://picsum.photos/seed/office/800/600" alt="Our Office" className="rounded-3xl shadow-xl" referrerPolicy="no-referrer" />
+          <img 
+            src={bankersGroupImg} 
+            alt="ECONEST Banking Executives" 
+            className="rounded-3xl shadow-xl border border-slate-200/80 w-full object-cover aspect-[4/3]" 
+            referrerPolicy="no-referrer" 
+          />
         </div>
       </div>
     </div>

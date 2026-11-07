@@ -31,7 +31,11 @@ import {
   Plane,
   X,
   ExternalLink,
-  Shield
+  Shield,
+  Search,
+  Filter,
+  ChevronRight,
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Account, Transaction } from '../../types';
@@ -163,6 +167,14 @@ const CustomerDashboard = () => {
   const [showCardDetails, setShowCardDetails] = useState(false);
   const [travelModeActive, setTravelModeActive] = useState(true);
 
+  // Ability to hide amount on ATM card and transactions (Privacy Mode)
+  const [isAmountHidden, setIsAmountHidden] = useState(() => {
+    const saved = localStorage.getItem(`econest_hide_amount_${user?.id || 'default'}`);
+    return saved === 'true';
+  });
+  const [txSearch, setTxSearch] = useState('');
+  const [txFilter, setTxFilter] = useState<'all' | 'debit' | 'credit'>('all');
+
   // High Yield Savings Vaults
   const [vaults, setVaults] = useState<VaultItem[]>([
     { id: 'v1', name: 'Global Treasury Reserve', target: 50000, saved: 18500, apy: '5.20% APY', currency: 'USD' },
@@ -178,6 +190,7 @@ const CustomerDashboard = () => {
 
   // Modal State for Wire Instructions
   const [showWireModal, setShowWireModal] = useState(false);
+  const [selectedReceiptTx, setSelectedReceiptTx] = useState<Transaction | null>(null);
 
   // Load balances and vaults from DB & Storage
   useEffect(() => {
@@ -277,6 +290,16 @@ const CustomerDashboard = () => {
     } else {
       toast.success('Card unfrozen and active for global payments.');
     }
+  };
+
+  // Toggle Hide Amount Privacy Mode
+  const toggleHideAmount = () => {
+    const next = !isAmountHidden;
+    setIsAmountHidden(next);
+    if (user) {
+      localStorage.setItem(`econest_hide_amount_${user.id}`, String(next));
+    }
+    toast.success(next ? 'Account amounts hidden (Privacy Mode ON)' : 'Account amounts visible', { id: 'hide-amt' });
   };
 
   // Vault helpers
@@ -510,172 +533,476 @@ const CustomerDashboard = () => {
   const totalNetWorth = calculateTotalNetWorth();
   const activeTemplate = CARD_TEMPLATES[activeCardIndex] || CARD_TEMPLATES[0];
 
+  const filteredTxs = transactions.filter(tx => {
+    const q = txSearch.toLowerCase();
+    const matchesSearch = 
+      !txSearch ||
+      (tx.description && tx.description.toLowerCase().includes(q)) ||
+      (tx.recipientName && tx.recipientName.toLowerCase().includes(q)) ||
+      (tx.recipientEmail && tx.recipientEmail.toLowerCase().includes(q)) ||
+      ((tx as any).recipient_email && (tx as any).recipient_email.toLowerCase().includes(q)) ||
+      (tx.reference_id && tx.reference_id.toLowerCase().includes(q)) ||
+      ((tx as any).referenceId && (tx as any).referenceId.toLowerCase().includes(q));
+
+    const matchesType = txFilter === 'all' || tx.type === txFilter;
+    return matchesSearch && matchesType;
+  });
+
   return (
     <div className="space-y-8 pb-16">
       
-      {/* 1. International Private Client Header & Global Coordinates */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm relative overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-          
-          {/* Client Identity & Tier */}
-          <div className="flex items-center gap-5">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-50 rounded-2xl border-2 border-emerald-500/20 shadow-md overflow-hidden flex-shrink-0 relative group">
-              {user?.profilePicture ? (
-                <img src={user.profilePicture} alt={user.fullName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-black text-xl">
-                  {user?.fullName?.charAt(0) || 'E'}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                  {user?.fullName || 'Private Client'}
-                </h1>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
-                  <ShieldCheck className="h-3 w-3 text-emerald-600" />
-                  Verified Global Account
-                </span>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-slate-100 text-slate-600 uppercase border border-slate-200">
-                  Tier 1 Wealth
-                </span>
+      {/* ATM Card & Relevant Transfer Action - Next to the Top Bar */}
+      <div id="atm-card-section" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch pt-1">
+        
+        {/* The Physical Luxury ATM Card - Reduced size by 50% */}
+        <div className="lg:col-span-5 flex justify-center lg:justify-start">
+          <div className="relative group w-full max-w-[340px]">
+            <div className="bg-gradient-to-tr from-[#031d16] via-[#083329] to-[#0f4437] rounded-2xl p-4 sm:p-5 text-white relative overflow-hidden shadow-xl shadow-emerald-950/40 aspect-[1.586/1] w-full flex flex-col justify-between border border-emerald-500/40 ring-1 ring-white/10 select-none transition-all duration-300">
+              
+              {/* Micro laser ripples for security styling */}
+              <div className="absolute inset-0 opacity-[0.08] pointer-events-none mix-blend-overlay">
+                <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <circle cx="20" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="0.5" />
+                  <circle cx="20" cy="50" r="20" fill="none" stroke="currentColor" strokeWidth="0.2" />
+                  <circle cx="80" cy="50" r="35" fill="none" stroke="currentColor" strokeWidth="0.5" />
+                  <circle cx="80" cy="50" r="25" fill="none" stroke="currentColor" strokeWidth="0.3" />
+                </svg>
               </div>
 
-              <p className="text-xs text-slate-500 font-medium flex items-center gap-3 flex-wrap">
-                <span className="flex items-center gap-1">
-                  <Globe className="h-3.5 w-3.5 text-emerald-600" />
-                  Jurisdiction: <strong className="text-slate-700 font-semibold">{user?.country || 'United Kingdom (London)'}</strong>
-                </span>
-                <span className="hidden sm:inline text-slate-300">•</span>
-                <span className="flex items-center gap-1">
-                  <Mail className="h-3.5 w-3.5 text-emerald-600" />
-                  ID: <span className="font-mono text-slate-700">{user?.email}</span>
-                </span>
+              {/* Card Top Row: Brand & Network */}
+              <div className="relative z-10 flex justify-between items-start">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-5 h-5 bg-white/10 rounded-md flex items-center justify-center border border-white/20">
+                      <Send className="h-2.5 w-2.5 text-white rotate-45 transform" />
+                    </div>
+                    <div>
+                      <span className="font-sans font-black tracking-[0.16em] text-xs text-white">ECONEST</span>
+                      <span className="text-[7px] font-bold text-emerald-400 tracking-[0.05em] ml-1 uppercase">WORLD ELITE</span>
+                    </div>
+                  </div>
+                  <p className="text-[7px] font-bold uppercase tracking-[0.12em] text-slate-300">ATM DEBIT & WIRE REPOSITORY</p>
+                </div>
+
+                <div className="flex items-center gap-1.5 text-right">
+                  <div>
+                    <p className="text-[7.5px] font-black text-emerald-400 tracking-wider uppercase leading-none">MASTERCARD</p>
+                    <p className="text-[6.5px] font-bold text-slate-300 uppercase tracking-tight">World Elite</p>
+                  </div>
+                  <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400">
+                    <ShieldCheck className="h-3 w-3" />
+                  </div>
+                </div>
+              </div>
+
+              {/* EMV Micro-Chip & Contactless waves */}
+              <div className="relative z-10 flex items-center justify-between mt-1">
+                <div className="w-[34px] h-[25px] rounded-md bg-gradient-to-br from-amber-200 via-yellow-400 to-amber-300 relative border border-amber-600/40 overflow-hidden shadow-md shadow-black/30">
+                  <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[0.5px] bg-yellow-900/40"></div>
+                  <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[0.5px] bg-yellow-900/40"></div>
+                  <div className="absolute inset-[3px] border border-yellow-800/20 rounded-[1.5px]"></div>
+                </div>
+
+                {/* Contactless Waves */}
+                <div className="flex items-center gap-0.5 opacity-80" title="Contactless Enabled">
+                  <div className="w-1 h-1 bg-slate-200 rounded-full"></div>
+                  <div className="w-[2px] h-2.5 border-r-2 border-slate-200 rounded-full"></div>
+                  <div className="w-[2px] h-3.5 border-r-2 border-slate-200 rounded-full"></div>
+                </div>
+              </div>
+
+              {/* Card Number */}
+              <div className="relative z-10 mt-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-[6.5px] text-slate-400 uppercase tracking-[0.2em] font-black">Card Number</p>
+                  <button
+                    onClick={() => copyToClipboard(rawAccNo, 'Card Number')}
+                    className="text-[8px] text-slate-300 hover:text-white flex items-center gap-1 transition-colors"
+                    title="Copy card number"
+                  >
+                    <Copy className="h-2 w-2" />
+                    <span>Copy</span>
+                  </button>
+                </div>
+                <p className="font-mono text-sm sm:text-base tracking-[0.12em] text-white font-black drop-shadow-md">
+                  {showCardDetails ? formattedAccNo : maskedAccNo}
+                </p>
+              </div>
+
+              {/* Expiry & CVV */}
+              <div className="relative z-10 flex items-center gap-4 mt-0.5">
+                <div className="flex items-center gap-1">
+                  <span className="text-[5.5px] font-black text-slate-400 uppercase leading-[6px] text-right">EXPIRES<br/>END</span>
+                  <span className="font-mono text-[10px] text-white font-bold tracking-wider">08 / 31</span>
+                </div>
+                <button
+                  onClick={() => setShowCardDetails(!showCardDetails)}
+                  className="flex items-center gap-1 cursor-pointer hover:opacity-90 transition-opacity"
+                  title="Toggle CVV view"
+                >
+                  <span className="text-[5.5px] font-black text-slate-400 uppercase leading-[6px] text-right">SECURITY<br/>CVV</span>
+                  <span className="font-mono text-[10px] text-white font-bold tracking-wider bg-black/40 px-1.5 py-0.5 rounded border border-white/10">
+                    {showCardDetails ? '482' : '•••'}
+                  </span>
+                </button>
+              </div>
+
+              {/* Card Holder & Balance with Hide Amount feature */}
+              <div className="relative z-10 flex justify-between items-end mt-1 pt-1.5 border-t border-white/10 gap-2">
+                <div className="min-w-0">
+                  <p className="text-[6.5px] text-slate-400 uppercase tracking-wider font-black">Cardholder</p>
+                  <p className="text-[11px] sm:text-xs font-bold tracking-wide text-slate-100 uppercase truncate max-w-[130px]">
+                    {user?.fullName || 'ELIZABETH ZAKS'}
+                  </p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="flex items-center justify-end gap-1">
+                    <p className="text-[6.5px] text-slate-400 uppercase tracking-wider font-black">Available Balance</p>
+                    <button
+                      onClick={toggleHideAmount}
+                      className="text-slate-400 hover:text-white transition-colors p-0.5 cursor-pointer"
+                      title={isAmountHidden ? "Reveal Balance" : "Hide Balance"}
+                    >
+                      {isAmountHidden ? <EyeOff className="h-2.5 w-2.5 text-amber-400" /> : <Eye className="h-2.5 w-2.5" />}
+                    </button>
+                  </div>
+                  <p className="text-xs sm:text-sm font-mono font-black text-white">
+                    {isAmountHidden ? (
+                      <span className="tracking-widest text-slate-300 font-bold select-none">••••••••</span>
+                    ) : (
+                      <span>${account?.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    )}{' '}
+                    <span className="text-[8px] font-sans text-slate-400">USD</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Relevant Transfer Actions - Clean & Focused */}
+        <div className="lg:col-span-7 flex flex-col justify-between bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-sm space-y-4">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                Capital Transfer
+              </span>
+              <button
+                onClick={toggleHideAmount}
+                className="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 cursor-pointer transition-colors"
+                title={isAmountHidden ? "Show Balance" : "Hide Balance"}
+              >
+                {isAmountHidden ? <Eye className="h-3.5 w-3.5 text-emerald-600" /> : <EyeOff className="h-3.5 w-3.5" />}
+                <span>{isAmountHidden ? 'Show Amount' : 'Hide Amount'}</span>
+              </button>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-xs font-medium text-slate-500">Available Liquid Balance</p>
+              <p className="text-2xl sm:text-3xl font-black font-mono text-slate-900 tracking-tight mt-0.5">
+                {isAmountHidden ? (
+                  <span className="text-slate-400 select-none">••••••••</span>
+                ) : (
+                  <span>${account?.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-sm font-sans font-bold text-slate-400">USD</span></span>
+                )}
               </p>
             </div>
           </div>
 
-          {/* Quick International Coordinates Bar */}
-          <div className="flex flex-wrap items-center gap-2.5 bg-slate-50 p-2.5 rounded-2xl border border-slate-200 text-xs">
-            <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">IBAN</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="font-mono font-bold text-slate-800 text-[11px]">{ibanNumber}</span>
-                <button 
-                  onClick={() => copyToClipboard(ibanNumber.replace(/\s/g, ''), 'IBAN')}
-                  className="text-slate-400 hover:text-emerald-600 p-0.5 transition-colors"
-                  title="Copy IBAN"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">SWIFT / BIC</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="font-mono font-bold text-slate-800 text-[11px]">{swiftBic}</span>
-                <button 
-                  onClick={() => copyToClipboard(swiftBic, 'SWIFT Code')}
-                  className="text-slate-400 hover:text-emerald-600 p-0.5 transition-colors"
-                  title="Copy SWIFT Code"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
+          {/* Primary Transfer Action Buttons */}
+          <div className="space-y-2.5">
+            <Link
+              to="/dashboard/transfers"
+              className="flex items-center justify-center gap-2.5 w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm uppercase tracking-wider rounded-2xl shadow-lg shadow-emerald-900/15 transition-all transform active:scale-[0.99]"
+            >
+              <Send className="h-4 w-4" />
+              <span>Transfer Money</span>
+            </Link>
 
             <button
               onClick={() => setShowWireModal(true)}
-              className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+              className="flex items-center justify-center gap-2 w-full py-3 px-5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider rounded-2xl shadow-sm transition-all border border-slate-800 cursor-pointer"
             >
               <Building2 className="h-3.5 w-3.5 text-emerald-400" />
-              <span>Wire Instructions</span>
+              <span>Wire Transfer Instructions</span>
             </button>
           </div>
+
+          {/* Quick One-Click Amount Transfer Shortcuts */}
+          <div className="pt-2 border-t border-slate-100">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Quick Transfer</p>
+            <div className="grid grid-cols-4 gap-2">
+              {[500, 1000, 2500, 5000].map((amt) => (
+                <Link
+                  key={amt}
+                  to={`/dashboard/transfers?amount=${amt}`}
+                  className="py-2 text-center text-xs font-mono font-bold text-slate-700 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 rounded-xl border border-slate-200 transition-all"
+                >
+                  ${amt.toLocaleString()}
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
+
       </div>
 
-      {/* 2. Consolidated Global Wealth Overview & International Action Hub */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 rounded-3xl p-6 sm:p-8 text-white border border-slate-800 shadow-xl relative overflow-hidden">
-        {/* Subtle background illumination */}
-        <div className="absolute top-0 right-0 w-[450px] h-[450px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none"></div>
-
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-          
-          {/* Valuation Display */}
-          <div className="space-y-3">
+      {/* 2b. Immediate Transaction History Ledger (Placed directly below ATM Card as requested) */}
+      <div id="transactions-ledger-section" className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 border border-slate-200 shadow-sm space-y-5 sm:space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black tracking-widest bg-emerald-500/20 text-emerald-400 uppercase border border-emerald-500/30">
-                <Globe className="h-3 w-3" />
-                CONSOLIDATED GLOBAL WEALTH
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black tracking-widest bg-blue-50 text-blue-700 uppercase border border-blue-200">
+                <Clock className="h-3 w-3" />
+                OFFICIAL TRANSACTION LEDGER
               </span>
-              <span className="text-xs text-emerald-400 font-bold flex items-center gap-0.5">
-                <TrendingUp className="h-3.5 w-3.5" />
-                +3.8% this month
-              </span>
-            </div>
-
-            <div className="flex items-baseline gap-3">
-              <span className="text-4xl sm:text-5xl font-black font-mono tracking-tight text-white">
-                {getCurrencySymbol(displayCurrency)}{totalNetWorth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-              <span className="text-sm font-black text-slate-400 font-sans uppercase tracking-widest">
-                {displayCurrency}
+              <span className="text-xs font-bold text-slate-500">
+                {filteredTxs.length} Record{filteredTxs.length === 1 ? '' : 's'}
               </span>
             </div>
-
-            <p className="text-xs text-slate-400 max-w-xl leading-relaxed">
-              Consolidated net liquid capital across all domestic, foreign exchange accounts, and high-yield reserve vaults.
+            <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight mt-1">
+              Transaction History & Settlements
+            </h3>
+            <p className="text-xs text-slate-500 font-medium">
+              Real-time audit log of domestic debits, international SWIFT wires, and incoming credits.
             </p>
           </div>
 
-          {/* Currency Display Selector & Global Actions */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            {/* Valuation Currency Switcher */}
-            <div className="bg-slate-800/80 p-1.5 rounded-2xl border border-slate-700/80 flex items-center justify-between gap-1 backdrop-blur-md">
-              <span className="text-[10px] font-bold text-slate-400 uppercase px-2">Valuation:</span>
-              {(['USD', 'EUR', 'GBP', 'CHF'] as const).map(curr => (
+          {/* Search & Filter Controls */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search recipient, email, ref..."
+                value={txSearch}
+                onChange={(e) => setTxSearch(e.target.value)}
+                className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full sm:w-64"
+              />
+              {txSearch && (
                 <button
-                  key={curr}
-                  onClick={() => setDisplayCurrency(curr)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                    displayCurrency === curr 
-                      ? 'bg-emerald-500 text-slate-950 shadow-md font-extrabold' 
-                      : 'text-slate-400 hover:text-white'
+                  onClick={() => setTxSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              {(['all', 'debit', 'credit'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setTxFilter(tab)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all uppercase ${
+                    txFilter === tab
+                      ? 'bg-white text-slate-900 shadow-xs font-black'
+                      : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  {curr}
+                  {tab === 'all' ? 'All' : tab === 'debit' ? 'Debits' : 'Credits'}
                 </button>
               ))}
             </div>
 
-            {/* Quick Action Links */}
-            <div className="flex items-center gap-2">
-              <Link
-                to="/dashboard/transfers"
-                className="flex-1 sm:flex-initial px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
-              >
-                <Send className="h-4 w-4" />
-                <span>Send Capital</span>
-              </Link>
-              <button
-                onClick={handleDownloadStatement}
-                className="px-4 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider transition-all border border-slate-700 flex items-center justify-center gap-2"
-                title="Download Certified Monthly Statement"
-              >
-                <FileText className="h-4 w-4" />
-                <span className="hidden sm:inline">Statement</span>
-              </button>
-            </div>
+            {/* Link to Full Statement */}
+            <Link
+              to="/dashboard/history"
+              className="text-xs font-black text-emerald-600 hover:text-emerald-700 flex items-center justify-center gap-1 uppercase tracking-wider px-3 py-2 bg-emerald-50 rounded-xl hover:bg-emerald-100 transition-colors"
+            >
+              <span>Full Statement</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
+        </div>
+
+        {/* Mobile & Tablet View: High-Visibility Transaction Cards (Zero Horizontal Scroll) */}
+        <div className="block lg:hidden space-y-3">
+          {filteredTxs.slice(0, 10).map((tx) => {
+            const isCredit = tx.type === 'credit';
+            return (
+              <div key={tx.id} className="p-3.5 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      isCredit ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {isCredit ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-slate-900 text-xs break-words leading-tight">{tx.description}</p>
+                      <p className="text-[10px] text-slate-500 font-mono mt-0.5">{safeFormat(tx.createdAt || tx.created_at, 'MMM dd, yyyy • HH:mm')}</p>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className={`font-mono font-black text-sm ${isCredit ? 'text-emerald-600' : 'text-slate-900'}`}>
+                      {isAmountHidden ? '••••••' : `${isCredit ? '+' : '-'}$${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+                    </p>
+                    <span className="text-[9px] font-bold text-slate-400">USD</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[10px] gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                      <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
+                      Settled
+                    </span>
+                    {tx.recipientName && (
+                      <span className="text-slate-500 font-medium break-words">To: {tx.recipientName}</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setSelectedReceiptTx(tx)}
+                    className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 font-bold transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
+                  >
+                    <FileText className="h-3 w-3 text-emerald-600" />
+                    <span>Receipt</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {filteredTxs.length === 0 && (
+            <div className="py-8 text-center text-slate-400">
+              <p className="text-xs font-bold text-slate-600">No transactions match your search</p>
+              <p className="text-[10px] text-slate-400 mt-1">Try adjusting the filter or search term</p>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop View: Transactions Table */}
+        <div className="hidden lg:block overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                <th className="pb-3 pl-2">Type / Rail</th>
+                <th className="pb-3">Counterparty & Description</th>
+                <th className="pb-3">Reference / Email</th>
+                <th className="pb-3">Date & Time</th>
+                <th className="pb-3">Status</th>
+                <th className="pb-3 text-right">Amount</th>
+                <th className="pb-3 pr-2 text-right">Receipt</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium">
+              {filteredTxs.slice(0, 10).map((tx) => {
+                const isCredit = tx.type === 'credit';
+                return (
+                  <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors group">
+                    {/* Rail / Type */}
+                    <td className="py-3.5 pl-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                          isCredit ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {isCredit ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 capitalize">{tx.type}</p>
+                          <p className="text-[10px] text-slate-400 uppercase font-semibold">
+                            {tx.transferType ? tx.transferType.toUpperCase() : 'SETTLED'}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Counterparty & Description */}
+                    <td className="py-3.5 max-w-xs">
+                      <p className="font-bold text-slate-900 truncate" title={tx.description}>
+                        {tx.description}
+                      </p>
+                      {tx.recipientName && (
+                        <p className="text-[11px] text-slate-500 font-normal">
+                          Beneficiary: <span className="font-medium text-slate-700">{tx.recipientName}</span>
+                        </p>
+                      )}
+                    </td>
+
+                    {/* Reference / Receiver Email */}
+                    <td className="py-3.5">
+                      <p className="font-mono text-[11px] text-slate-600 font-bold">
+                        {tx.referenceId || tx.reference_id || `TX-${tx.id.slice(0, 8).toUpperCase()}`}
+                      </p>
+                      {(tx.recipientEmail || tx.recipient_email) && (
+                        <p className="text-[11px] text-blue-600 font-medium truncate max-w-[180px]" title={tx.recipientEmail || tx.recipient_email}>
+                          {tx.recipientEmail || tx.recipient_email}
+                        </p>
+                      )}
+                    </td>
+
+                    {/* Date */}
+                    <td className="py-3.5 text-slate-500 whitespace-nowrap">
+                      {safeFormat(tx.createdAt || tx.created_at, 'MMM dd, yyyy • HH:mm')}
+                    </td>
+
+                    {/* Status */}
+                    <td className="py-3.5">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        Settled
+                      </span>
+                    </td>
+
+                    {/* Amount (Respects isAmountHidden) */}
+                    <td className="py-3.5 text-right font-mono font-black text-sm whitespace-nowrap">
+                      {isAmountHidden ? (
+                        <span className="text-slate-400 select-none tracking-widest font-bold">••••••</span>
+                      ) : (
+                        <span className={isCredit ? 'text-emerald-600' : 'text-slate-900'}>
+                          {isCredit ? '+' : '-'}${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-400 ml-1 font-sans font-normal">USD</span>
+                    </td>
+
+                    {/* Receipt Action */}
+                    <td className="py-3.5 pr-2 text-right">
+                      <button
+                        onClick={() => setSelectedReceiptTx(tx)}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 text-[11px] font-bold transition-colors inline-flex items-center gap-1"
+                        title="View Official Transaction Receipt"
+                      >
+                        <FileText className="h-3 w-3" />
+                        <span>Receipt</span>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {filteredTxs.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400 font-medium">
+                    <p className="text-sm font-bold text-slate-600">No transactions match your search</p>
+                    <p className="text-xs text-slate-400 mt-1">Try adjusting the filter or search term</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer info & view all */}
+        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-3">
+          <p className="text-[11px]">
+            Showing recent settlements. All transactions are cryptographically verified and backed by FDIC/Central Bank clearance.
+          </p>
+          <Link
+            to="/dashboard/history"
+            className="text-xs font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-wider flex items-center gap-1 whitespace-nowrap"
+          >
+            <span>Complete Ledger ({transactions.length})</span>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
       </div>
 
       {/* 3. Multi-Currency Global Accounts (Wallets) */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 border border-slate-200 shadow-sm space-y-5 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
           <div>
             <div className="flex items-center gap-2">
@@ -744,252 +1071,13 @@ const CustomerDashboard = () => {
         </div>
       </div>
 
-      {/* 4. Luxury World Elite International Card & Smart Card Controls */}
-      <div className="grid lg:grid-cols-3 gap-8 items-start">
-        
-        {/* Physical Luxury Card Rendering */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-emerald-600" />
-                  World Elite International Debit Card
-                </h3>
-                <p className="text-xs text-slate-500 font-medium">
-                  Accepted globally across 210+ countries with zero foreign exchange transaction fees.
-                </p>
-              </div>
 
-              {/* Integrated luxury metal switcher tabs */}
-              <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
-                {CARD_TEMPLATES.map((tpl, idx) => (
-                  <button
-                    key={tpl.id}
-                    onClick={() => {
-                      setActiveCardIndex(idx);
-                      if (user) {
-                        localStorage.setItem(`econest_card_pref_${user.id}`, String(idx));
-                      }
-                      toast.success(`Active card switched to ${tpl.name}!`, { id: 'card-switch' });
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
-                      activeCardIndex === idx
-                        ? 'bg-white text-slate-900 shadow-sm scale-102 ring-1 ring-slate-200'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <div className={`w-2 h-2 rounded-full bg-gradient-to-tr ${tpl.bg}`} />
-                    <span className="hidden sm:inline">{tpl.name.split(' ')[0]}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Visual Card Showcase */}
-            <div className="relative group">
-              <div className={`bg-gradient-to-tr ${activeTemplate.bg} rounded-[2rem] p-6 sm:p-8 text-white relative overflow-hidden shadow-2xl ${activeTemplate.glowColor} aspect-auto sm:aspect-[1.586/1] min-h-[290px] sm:min-h-0 w-full max-w-xl mx-auto flex flex-col justify-between border ${activeTemplate.border} ring-1 ring-white/5 select-none transition-all duration-500`}>
-                
-                {/* Micro laser ripples for security styling */}
-                <div className="absolute inset-0 opacity-[0.06] pointer-events-none mix-blend-overlay">
-                  <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <circle cx="20" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="0.5" />
-                    <circle cx="20" cy="50" r="20" fill="none" stroke="currentColor" strokeWidth="0.2" />
-                    <circle cx="80" cy="50" r="35" fill="none" stroke="currentColor" strokeWidth="0.5" />
-                    <circle cx="80" cy="50" r="25" fill="none" stroke="currentColor" strokeWidth="0.3" />
-                  </svg>
-                </div>
-
-                {/* Frozen Overlay */}
-                {isCardFrozen && (
-                  <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs z-30 flex flex-col items-center justify-center p-6 text-center rounded-[2rem]">
-                    <div className="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400 mb-2">
-                      <Lock className="h-6 w-6" />
-                    </div>
-                    <h4 className="text-base font-black text-white tracking-wider uppercase">Card Temporarily Frozen</h4>
-                    <p className="text-xs text-slate-300 mt-1 max-w-xs">All card transactions and online payments are securely locked.</p>
-                    <button
-                      onClick={handleToggleFreeze}
-                      className="mt-4 px-4 py-2 bg-emerald-500 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-lg hover:bg-emerald-400 transition-all"
-                    >
-                      Unfreeze Card
-                    </button>
-                  </div>
-                )}
-
-                {/* Card Header */}
-                <div className="relative z-10 flex justify-between items-start">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 bg-white/10 rounded-lg flex items-center justify-center border border-white/20">
-                        <Send className="h-3.5 w-3.5 text-white rotate-45 transform" />
-                      </div>
-                      <div>
-                        <span className="font-sans font-black tracking-[0.2em] text-sm sm:text-base text-white">ECONEST</span>
-                        <span className={`text-[9px] font-bold ${activeTemplate.accentText} tracking-[0.05em] ml-1.5 uppercase`}>{activeTemplate.type}</span>
-                      </div>
-                    </div>
-                    <p className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.16em] text-slate-300">{activeTemplate.category}</p>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-right">
-                    <div>
-                      <p className={`text-[8px] font-black ${activeTemplate.accentText} tracking-widest uppercase`}>{activeTemplate.network}</p>
-                      <p className="text-[7px] font-bold text-slate-300 uppercase tracking-wider">World Elite Debit</p>
-                    </div>
-                    <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
-                      <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* EMV Micro-Chip & Contactless waves */}
-                <div className="relative z-10 flex items-center justify-between mt-3 sm:mt-5">
-                  <div className={`w-[48px] h-[36px] rounded-lg bg-gradient-to-br ${activeTemplate.chipGradient} relative border border-amber-600/40 overflow-hidden shadow-md shadow-black/30`}>
-                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[0.5px] bg-yellow-900/40"></div>
-                    <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[0.5px] bg-yellow-900/40"></div>
-                    <div className="absolute inset-[5px] border border-yellow-800/20 rounded-[2px]"></div>
-                  </div>
-
-                  <div className="flex items-center gap-1 opacity-70">
-                    <div className="w-1.5 h-1.5 bg-slate-300 rounded-full"></div>
-                    <div className="w-[3px] h-3 border-r-2 border-slate-300 rounded-full"></div>
-                    <div className="w-[3px] h-4.5 border-r-2 border-slate-300 rounded-full"></div>
-                  </div>
-                </div>
-
-                {/* Card Number */}
-                <div className="relative z-10 mt-3 sm:mt-4">
-                  <p className="text-[7px] text-slate-400 uppercase tracking-[0.25em] font-black pb-0.5">Card Number</p>
-                  <p className="font-mono text-lg sm:text-2xl tracking-[0.14em] text-white font-black drop-shadow-md">
-                    {showCardDetails ? formattedAccNo : maskedAccNo}
-                  </p>
-                </div>
-
-                {/* Expiry & CVV */}
-                <div className="relative z-10 flex items-center gap-6 mt-1 sm:mt-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[6px] font-black text-slate-400 uppercase leading-[7px] text-right">EXPIRES<br/>END</span>
-                    <span className="font-mono text-xs text-white font-bold tracking-widest">08 / 31</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[6px] font-black text-slate-400 uppercase leading-[7px] text-right">SECURITY<br/>CVV</span>
-                    <span className="font-mono text-xs text-white font-bold tracking-widest bg-black/40 px-2 py-0.5 rounded border border-white/10">
-                      {showCardDetails ? '482' : '•••'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Card Holder & Balance */}
-                <div className="relative z-10 flex justify-between items-end mt-3 pt-2 border-t border-white/10 gap-4">
-                  <div>
-                    <p className="text-[7px] text-slate-400 uppercase tracking-widest font-black">Cardholder</p>
-                    <p className="text-xs sm:text-sm font-bold tracking-wider text-slate-100 uppercase">
-                      {user?.fullName}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[7px] text-slate-400 uppercase tracking-widest font-black">Available Credit</p>
-                    <p className="text-sm sm:text-lg font-mono font-black text-white">
-                      ${account?.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-[9px] font-sans text-slate-400">USD</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Smart Card Management Suite */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-5">
-          <div>
-            <h4 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Shield className="h-4 w-4 text-emerald-600" />
-              Card Security & Travel Suite
-            </h4>
-            <p className="text-xs text-slate-500 mt-0.5">Control authorization channels and international spending boundaries in real time.</p>
-          </div>
-
-          <div className="space-y-3 pt-1">
-            {/* Freeze Toggle */}
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
-              <div className="space-y-0.5">
-                <p className="text-xs font-bold text-slate-800">Freeze Debit Card</p>
-                <p className="text-[10px] text-slate-500 font-medium">Instantly disable POS and ATM charges</p>
-              </div>
-              <button
-                onClick={handleToggleFreeze}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                  isCardFrozen 
-                    ? 'bg-rose-600 text-white shadow-sm' 
-                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                {isCardFrozen ? 'Frozen' : 'Active'}
-              </button>
-            </div>
-
-            {/* Show Details Toggle */}
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
-              <div className="space-y-0.5">
-                <p className="text-xs font-bold text-slate-800">Card Credentials</p>
-                <p className="text-[10px] text-slate-500 font-medium">Reveal full 16 digits and 3-digit CVV</p>
-              </div>
-              <button
-                onClick={() => setShowCardDetails(!showCardDetails)}
-                className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center gap-1.5"
-              >
-                {showCardDetails ? <EyeOff className="h-3.5 w-3.5 text-slate-600" /> : <Eye className="h-3.5 w-3.5 text-slate-600" />}
-                <span>{showCardDetails ? 'Hide' : 'Reveal'}</span>
-              </button>
-            </div>
-
-            {/* International Travel Mode */}
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
-              <div className="space-y-0.5">
-                <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                  <Plane className="h-3.5 w-3.5 text-blue-600" />
-                  International Travel Mode
-                </p>
-                <p className="text-[10px] text-slate-500 font-medium">Prevent foreign travel fraud triggers</p>
-              </div>
-              <button
-                onClick={() => {
-                  setTravelModeActive(!travelModeActive);
-                  toast.success(travelModeActive ? 'Travel mode paused' : 'Travel mode active for seamless overseas payments');
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                  travelModeActive ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-700 border border-slate-200'
-                }`}
-              >
-                {travelModeActive ? 'Enabled' : 'Disabled'}
-              </button>
-            </div>
-
-            {/* Copy Card Number */}
-            <button
-              onClick={() => copyToClipboard(rawAccNo, 'Card Number')}
-              className="w-full py-2.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-2 transition-all shadow-2xs"
-            >
-              <Copy className="h-3.5 w-3.5 text-slate-500" />
-              <span>Copy 16-Digit Card Number</span>
-            </button>
-          </div>
-
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Apple Pay / Google Wallet Ready
-            </span>
-            <span className="font-mono text-slate-400">EMV 3DS-2</span>
-          </div>
-        </div>
-      </div>
 
       {/* 5. Institutional Interbank FX Desk & High-Yield Global Savings Vaults */}
       <div className="grid lg:grid-cols-2 gap-8 items-start">
         
         {/* Institutional Foreign Exchange Converter */}
-        <div id="fx-swap-desk" className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+        <div id="fx-swap-desk" className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 border border-slate-200 shadow-sm space-y-5 sm:space-y-6">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
               <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black bg-amber-50 text-amber-700 uppercase tracking-widest border border-amber-100">
@@ -1139,7 +1227,7 @@ const CustomerDashboard = () => {
         </div>
 
         {/* Global Treasury & High-Yield Escrow Vaults */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 border border-slate-200 shadow-sm space-y-5 sm:space-y-6">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
               <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black bg-purple-50 text-purple-700 uppercase tracking-widest border border-purple-100">
@@ -1223,7 +1311,7 @@ const CustomerDashboard = () => {
       </div>
 
       {/* 6. Cashflow Analytics & Sector Outflow Distribution */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 border border-slate-200 shadow-sm space-y-5 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
           <div>
             <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black bg-indigo-50 text-indigo-700 uppercase tracking-widest border border-indigo-100">
@@ -1274,58 +1362,7 @@ const CustomerDashboard = () => {
         </div>
       </div>
 
-      {/* 7. Live Transaction Log Section */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
-              <Clock className="h-5 w-5 text-emerald-600" />
-              Recent International Settlements
-            </h3>
-            <p className="text-xs text-slate-500 font-medium">Real-time ledger activity across all international rails.</p>
-          </div>
-          <Link 
-            to="/dashboard/history"
-            className="text-xs font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-wider flex items-center gap-1"
-          >
-            <span>Complete Statement</span>
-            <ArrowUpRight className="h-4 w-4" />
-          </Link>
-        </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {transactions.slice(0, 4).map((tx) => (
-            <div key={tx.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-emerald-300 transition-all flex flex-col justify-between space-y-3">
-              <div className="flex items-center justify-between">
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                  tx.type === 'credit' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                }`}>
-                  {tx.type === 'credit' ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
-                </div>
-                <p className={`text-base font-black font-mono ${
-                  tx.type === 'credit' ? 'text-emerald-600' : 'text-slate-900'
-                }`}>
-                  {tx.type === 'credit' ? '+' : '-'}${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs font-black text-slate-800 truncate" title={tx.description}>{tx.description}</p>
-                <div className="flex items-center justify-between mt-1 text-[10px] font-bold text-slate-400 uppercase">
-                  <span>{safeFormat(tx.createdAt || tx.created_at, 'MMM dd, HH:mm')}</span>
-                  <span className="text-emerald-600 font-black">Settled</span>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {transactions.length === 0 && (
-            <div className="col-span-full py-12 text-center text-slate-400 text-xs font-bold uppercase tracking-wider">
-              No recent international settlements recorded.
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Wire Instructions Modal */}
       {showWireModal && (
@@ -1405,6 +1442,119 @@ const CustomerDashboard = () => {
                 className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-wider"
               >
                 Close Instructions
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Official Transaction Settlement Receipt Modal */}
+      {selectedReceiptTx && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border border-slate-200 shadow-2xl relative space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+                  selectedReceiptTx.type === 'credit' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                }`}>
+                  {selectedReceiptTx.type === 'credit' ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
+                </div>
+                <div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-50 text-emerald-700 uppercase tracking-widest border border-emerald-200">
+                    SETTLED AUDIT RECEIPT
+                  </span>
+                  <h3 className="text-base font-black text-slate-900 mt-0.5">
+                    {selectedReceiptTx.type === 'credit' ? 'Inward Wire Receipt' : 'Outward Transfer Receipt'}
+                  </h3>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedReceiptTx(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Amount Banner */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Settled Amount</p>
+              <p className={`text-2xl font-black font-mono ${
+                selectedReceiptTx.type === 'credit' ? 'text-emerald-600' : 'text-slate-900'
+              }`}>
+                {selectedReceiptTx.type === 'credit' ? '+' : '-'}${selectedReceiptTx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
+              </p>
+              <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                <Check className="h-3 w-3" />
+                <span>Interbank Clearance Completed</span>
+              </div>
+            </div>
+
+            {/* Details Table */}
+            <div className="space-y-2.5 text-xs">
+              <div className="flex justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-400 font-medium">Reference Code:</span>
+                <span className="font-mono font-bold text-slate-800">
+                  {selectedReceiptTx.referenceId || selectedReceiptTx.reference_id || `TX-${selectedReceiptTx.id.slice(0, 10).toUpperCase()}`}
+                </span>
+              </div>
+
+              {selectedReceiptTx.recipientName && (
+                <div className="flex justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-400 font-medium">Beneficiary / Recipient:</span>
+                  <span className="font-bold text-slate-800">{selectedReceiptTx.recipientName}</span>
+                </div>
+              )}
+
+              {(selectedReceiptTx.recipientEmail || selectedReceiptTx.recipient_email) && (
+                <div className="flex justify-between py-1.5 border-b border-slate-100 gap-3">
+                  <span className="text-slate-400 font-medium shrink-0">Receiver Email:</span>
+                  <span className="font-medium text-blue-600 break-all text-right">{selectedReceiptTx.recipientEmail || selectedReceiptTx.recipient_email}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between py-1.5 border-b border-slate-100 gap-3">
+                <span className="text-slate-400 font-medium shrink-0">Description:</span>
+                <span className="font-bold text-slate-800 text-right break-words max-w-[220px]" title={selectedReceiptTx.description}>
+                  {selectedReceiptTx.description}
+                </span>
+              </div>
+
+              <div className="flex justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-400 font-medium">Transfer Rail:</span>
+                <span className="font-bold text-slate-800 uppercase">
+                  {selectedReceiptTx.transferType ? `${selectedReceiptTx.transferType} Wire` : 'Federal Reserve Wire'}
+                </span>
+              </div>
+
+              <div className="flex justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-400 font-medium">Settlement Date:</span>
+                <span className="font-medium text-slate-800">
+                  {safeFormat(selectedReceiptTx.createdAt || selectedReceiptTx.created_at, 'MMMM dd, yyyy • HH:mm:ss')}
+                </span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
+                onClick={() => {
+                  copyToClipboard(
+                    selectedReceiptTx.referenceId || selectedReceiptTx.reference_id || selectedReceiptTx.id,
+                    'Reference ID'
+                  );
+                }}
+                className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                <span>Copy Ref</span>
+              </button>
+              <button
+                onClick={() => setSelectedReceiptTx(null)}
+                className="py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-colors"
+              >
+                Done
               </button>
             </div>
           </div>

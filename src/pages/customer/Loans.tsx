@@ -45,7 +45,7 @@ const LoanCalculator = ({ interestRate }: { interestRate: number }) => {
   const totalInterest = totalRepayment - amount;
 
   return (
-    <div className="bg-slate-900 rounded-3xl p-8 text-white shadow-xl">
+    <div className="bg-slate-900 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 text-white shadow-xl">
       <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
         <TrendingUp className="h-5 w-5 text-emerald-400" />
         Loan Calculator
@@ -231,7 +231,7 @@ const CustomerLoans = () => {
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Application Form */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm sticky top-8">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 border border-slate-200 shadow-sm sticky top-8">
             <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-emerald-600" />
               Apply for a Loan

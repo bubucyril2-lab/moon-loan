@@ -12,13 +12,14 @@ import {
   ShieldCheck,
   Banknote,
   Wallet,
-  X
+  X,
+  Mail,
+  ArrowLeft
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import NotificationCenter from '../NotificationCenter';
-import GoogleTranslate from '../common/GoogleTranslate';
 import { MobileBottomNav } from './MobileBottomNav';
 
 function cn(...inputs: ClassValue[]) {
@@ -46,14 +47,15 @@ const AdminLayout = () => {
     { icon: ArrowRightLeft, label: 'Transactions', path: '/admin/transactions' },
     { icon: Banknote, label: 'Loan Requests', path: '/admin/loans' },
     { icon: Wallet, label: 'Payment Methods', path: '/admin/payment-methods' },
-    { icon: MessageSquare, label: 'Support Chat', path: '/admin/chat' },
+    { icon: MessageSquare, label: 'Support Live Chat', path: '/admin/chat' },
     { icon: Settings, label: 'System Settings', path: '/admin/settings' },
   ];
 
   const bottomNavItems = [
     { label: 'Overview', icon: LayoutDashboard, path: '/admin' },
     { label: 'Customers', icon: Users, path: '/admin/customers' },
-    { label: 'Transactions', icon: ArrowRightLeft, path: '/admin/transactions' },
+    { label: 'Transfers', icon: ArrowRightLeft, path: '/admin/transactions' },
+    { label: 'Live Chat', icon: MessageSquare, path: '/admin/chat' },
     { label: 'Settings', icon: Settings, path: '/admin/settings' },
   ];
 
@@ -132,25 +134,30 @@ const AdminLayout = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden pb-16 lg:pb-0">
-        {/* Header */}
-        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
+        {/* Header with Mobile App Navigation & Return Icon */}
+        <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 h-16 flex items-center justify-between px-3 sm:px-6 sticky top-0 z-30">
           <div className="flex items-center gap-2">
+            {location.pathname !== '/admin' ? (
+              <button 
+                onClick={() => navigate(-1)}
+                className="lg:hidden p-2 text-slate-700 hover:bg-slate-100 rounded-xl transition-all border border-slate-200 shadow-2xs"
+                title="Return / Go Back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+            ) : null}
+
             <button 
               onClick={() => setIsSidebarOpen(true)}
-              className="lg:hidden flex items-center gap-2 p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all font-medium"
+              className="lg:hidden flex items-center gap-1.5 p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all font-medium"
+              title="Open Navigation Menu"
             >
               <Menu className="h-6 w-6" />
-              <span className="hidden sm:block text-xs font-bold uppercase tracking-wider">Menu</span>
+              <span className="text-xs font-black uppercase tracking-wider text-slate-800">Admin</span>
             </button>
-            <div className="lg:hidden">
-              <GoogleTranslate />
-            </div>
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="hidden lg:block">
-              <GoogleTranslate />
-            </div>
             <NotificationCenter />
             <button
               onClick={handleLogout}

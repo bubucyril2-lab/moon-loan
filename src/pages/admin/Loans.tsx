@@ -214,116 +214,204 @@ const AdminLoans = () => {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Applicant</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Loan Details</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
-                  </td>
-                </tr>
-              ) : filteredLoans.map((loan) => (
-                <tr key={loan.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-                        <User className="h-5 w-5 text-slate-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-900">{loan.full_name}</p>
-                        <p className="text-xs text-slate-500 flex items-center gap-1">
-                          <Mail className="h-3 w-3" /> {loan.email}
-                        </p>
-                      </div>
+        {/* Loading State */}
+        {isLoading && (
+          <div className="px-6 py-12 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && filteredLoans.length === 0 && (
+          <div className="px-6 py-12 text-center text-slate-500 text-xs">
+            No loan applications found.
+          </div>
+        )}
+
+        {/* 1. MOBILE & TABLET RESPONSIVE CARDS (< 1024px, Zero Horizontal Scroll) */}
+        {!isLoading && filteredLoans.length > 0 && (
+          <div className="divide-y divide-slate-100 lg:hidden">
+            {filteredLoans.map((loan) => (
+              <div key={loan.id} className="p-4 sm:p-5 space-y-3 hover:bg-slate-50/60 transition-colors">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
+                      <User className="h-5 w-5 text-slate-600" />
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-bold text-slate-900">${loan.amount.toLocaleString()}</p>
-                    <div className="flex flex-col gap-1 mt-1">
-                      <p className="text-[10px] text-slate-400 uppercase font-bold">
-                        {loan.interest_rate}% • {loan.repayment_schedule}
-                      </p>
-                      {(loan.status === 'approved' || loan.status === 'repaying' || loan.status === 'completed') && (
-                        <div className="w-24 space-y-1">
-                          <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-emerald-500"
-                              style={{ width: `${(loan.paid_amount / loan.amount) * 100}%` }}
-                            ></div>
-                          </div>
-                          <p className="text-[8px] text-slate-400 font-bold">
-                            Paid: ${loan.paid_amount.toLocaleString()}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-slate-900 break-words">{loan.full_name}</p>
+                      <p className="text-xs text-slate-500 break-all font-mono mt-0.5">{loan.email}</p>
+                    </div>
+                  </div>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize shrink-0 ${
+                    loan.status === 'approved' || loan.status === 'repaying' ? 'bg-emerald-100 text-emerald-700' :
+                    loan.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                    loan.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {loan.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Requested Loan</span>
+                    <span className="font-bold text-slate-900 font-mono text-sm">${loan.amount.toLocaleString()}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Interest & Schedule</span>
+                    <span className="font-medium text-slate-700">{loan.interest_rate}% • {loan.repayment_schedule}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Application Date</span>
+                    <span className="text-slate-600 font-mono text-[11px]">{safeFormat(loan.created_at, 'MMM dd, yyyy')}</span>
+                  </div>
+                  <div className="text-right">
+                    {(loan.status === 'approved' || loan.status === 'repaying' || loan.status === 'completed') && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Repaid Amount</span>
+                        <span className="font-bold text-emerald-600 font-mono">${loan.paid_amount.toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions Toolbar */}
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  {loan.status === 'pending' && (
+                    <>
+                      <button 
+                        onClick={() => handleStatusUpdate(loan.id, 'approved')}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1 shadow-sm"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>Approve</span>
+                      </button>
+                      <button 
+                        onClick={() => handleStatusUpdate(loan.id, 'rejected')}
+                        className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        <span>Reject</span>
+                      </button>
+                    </>
+                  )}
+                  {(loan.status === 'approved' || loan.status === 'repaying') && (
+                    <button 
+                      onClick={() => setSelectedLoan(loan)}
+                      className="px-3.5 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all shadow-sm"
+                    >
+                      Record Repayment
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 2. DESKTOP TABLE VIEW (Visible only on lg screens >= 1024px) */}
+        {!isLoading && filteredLoans.length > 0 && (
+          <div className="hidden lg:block overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Applicant</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Loan Details</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredLoans.map((loan) => (
+                  <tr key={loan.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+                          <User className="h-5 w-5 text-slate-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">{loan.full_name}</p>
+                          <p className="text-xs text-slate-500 flex items-center gap-1">
+                            <Mail className="h-3 w-3" /> {loan.email}
                           </p>
                         </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm text-slate-600">{safeFormat(loan.created_at, 'MMM dd, yyyy')}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize ${
-                      loan.status === 'approved' || loan.status === 'repaying' ? 'bg-emerald-100 text-emerald-700' :
-                      loan.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                      loan.status === 'completed' ? 'bg-blue-100 text-blue-700' :
-                      'bg-red-100 text-red-700'
-                    }`}>
-                      {loan.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {loan.status === 'pending' && (
-                        <>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-bold text-slate-900">${loan.amount.toLocaleString()}</p>
+                      <div className="flex flex-col gap-1 mt-1">
+                        <p className="text-[10px] text-slate-400 uppercase font-bold">
+                          {loan.interest_rate}% • {loan.repayment_schedule}
+                        </p>
+                        {(loan.status === 'approved' || loan.status === 'repaying' || loan.status === 'completed') && (
+                          <div className="w-24 space-y-1">
+                            <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-emerald-500"
+                                style={{ width: `${(loan.paid_amount / loan.amount) * 100}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-[8px] text-slate-400 font-bold">
+                              Paid: ${loan.paid_amount.toLocaleString()}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm text-slate-600">{safeFormat(loan.created_at, 'MMM dd, yyyy')}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize ${
+                        loan.status === 'approved' || loan.status === 'repaying' ? 'bg-emerald-100 text-emerald-700' :
+                        loan.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                        loan.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {loan.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {loan.status === 'pending' && (
+                          <>
+                            <button 
+                              onClick={() => handleStatusUpdate(loan.id, 'approved')}
+                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                              title="Approve"
+                            >
+                              <CheckCircle2 className="h-5 w-5" />
+                            </button>
+                            <button 
+                              onClick={() => handleStatusUpdate(loan.id, 'rejected')}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              title="Reject"
+                            >
+                              <XCircle className="h-5 w-5" />
+                            </button>
+                          </>
+                        )}
+                        {(loan.status === 'approved' || loan.status === 'repaying') && (
                           <button 
-                            onClick={() => handleStatusUpdate(loan.id, 'approved')}
-                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                            title="Approve"
+                            onClick={() => setSelectedLoan(loan)}
+                            className="px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded-lg hover:bg-slate-800 transition-all"
                           >
-                            <CheckCircle2 className="h-5 w-5" />
+                            Record Repayment
                           </button>
-                          <button 
-                            onClick={() => handleStatusUpdate(loan.id, 'rejected')}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                            title="Reject"
-                          >
-                            <XCircle className="h-5 w-5" />
-                          </button>
-                        </>
-                      )}
-                      {(loan.status === 'approved' || loan.status === 'repaying') && (
-                        <button 
-                          onClick={() => setSelectedLoan(loan)}
-                          className="px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded-lg hover:bg-slate-800 transition-all"
-                        >
-                          Record Repayment
+                        )}
+                        <button className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all">
+                          <ArrowRight className="h-5 w-5" />
                         </button>
-                      )}
-                      <button className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all">
-                        <ArrowRight className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!isLoading && filteredLoans.length === 0 && (
-            <div className="px-6 py-12 text-center text-slate-500">
-              No loan applications found.
-            </div>
-          )}
-        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Repayment Modal */}

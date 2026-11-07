@@ -5,13 +5,16 @@ import {
   Loader2, 
   MessageSquare, 
   ShieldCheck,
-  ArrowLeft
+  ArrowLeft,
+  X,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../hooks/useChat';
 import { format } from 'date-fns';
 import { safeFormat } from '../../utils/date';
 import { useNavigate } from 'react-router-dom';
+import { emailService } from '../../services/emailService';
 
 const CustomerChat = () => {
   const { user } = useAuth();
@@ -27,11 +30,12 @@ const CustomerChat = () => {
     }
   }, [messages]);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
-    sendMessage(input);
+    if (!input.trim() || !user) return;
+    const msgText = input.trim();
     setInput('');
+    sendMessage(msgText);
   };
 
   return (
@@ -52,17 +56,27 @@ const CustomerChat = () => {
             <div className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 border-white rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
           </div>
           <div>
-            <h3 className="font-bold text-slate-900">ECONEST BANK Support</h3>
+            <h3 className="font-bold text-slate-900">ECONEST Instant Support</h3>
             <p className="text-xs text-slate-500 flex items-center gap-1">
-              {isOnline ? 'Online - Ready to help' : 'Offline - We will reply soon'}
+              {isOnline ? 'Online - Instant Live Assistance' : 'Offline - Agents review shortly'}
             </p>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-all"
+            title="Close & Return to Dashboard"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
       </div>
 
       <div 
         ref={scrollRef}
-        className="flex-1 bg-slate-50 border-x border-slate-200 overflow-y-auto p-6 space-y-4"
+        className="flex-1 bg-slate-50 border-x border-slate-200 overflow-y-auto p-4 sm:p-6 space-y-3"
       >
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8">
@@ -75,23 +89,29 @@ const CustomerChat = () => {
             </p>
           </div>
         ) : (
-          messages.map((msg, i) => (
-            <div 
-              key={i} 
-              className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
-            >
-              <div className={`max-w-[80%] rounded-2xl p-4 shadow-sm ${
-                msg.senderId === user?.id 
-                  ? 'bg-emerald-600 text-white rounded-tr-none' 
-                  : 'bg-white text-slate-900 border border-slate-200 rounded-tl-none'
-              }`}>
-                <p className="text-sm leading-relaxed">{msg.text}</p>
-                <p className={`text-[10px] mt-2 opacity-60 ${msg.senderId === user?.id ? 'text-right' : 'text-left'}`}>
-                  {safeFormat(msg.createdAt, 'HH:mm')}
-                </p>
+          messages.map((msg, i) => {
+            const isMe = msg.senderId === user?.id || !msg.isAdmin;
+            return (
+              <div 
+                key={i} 
+                className={`w-full flex ${isMe ? 'justify-end' : 'justify-start'} my-1.5`}
+              >
+                <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 shadow-sm ${
+                  isMe 
+                    ? 'bg-emerald-600 text-white rounded-tr-none ml-auto' 
+                    : 'bg-white text-slate-900 border border-slate-200 rounded-tl-none mr-auto'
+                }`}>
+                  <p className={`text-[10px] font-bold mb-1 ${isMe ? 'text-emerald-100 text-right' : 'text-slate-400 text-left'}`}>
+                    {isMe ? 'You' : 'ECONEST Live Support'}
+                  </p>
+                  <p className="text-sm leading-relaxed">{msg.text}</p>
+                  <p className={`text-[10px] mt-1.5 ${isMe ? 'text-right text-emerald-200' : 'text-left text-slate-400'}`}>
+                    {safeFormat(msg.createdAt, 'HH:mm')}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

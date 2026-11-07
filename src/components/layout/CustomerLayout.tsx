@@ -11,13 +11,14 @@ import {
   X,
   User,
   Banknote,
-  Settings
+  Settings,
+  Mail,
+  ArrowLeft
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import NotificationCenter from '../NotificationCenter';
-import GoogleTranslate from '../common/GoogleTranslate';
 import { MobileBottomNav } from './MobileBottomNav';
 
 function cn(...inputs: ClassValue[]) {
@@ -44,15 +45,16 @@ const CustomerLayout = () => {
     { icon: ArrowRightLeft, label: 'Transfers', path: '/dashboard/transfers' },
     { icon: History, label: 'History', path: '/dashboard/history' },
     { icon: Banknote, label: 'Loans', path: '/dashboard/loans' },
-    { icon: MessageSquare, label: 'Support Chat', path: '/dashboard/chat' },
+    { icon: MessageSquare, label: 'Live Support Chat', path: '/dashboard/chat' },
     { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
   ];
 
   const bottomNavItems = [
     { label: 'Overview', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Transfers', icon: ArrowRightLeft, path: '/dashboard/transfers' },
+    { label: 'Loans', icon: Banknote, path: '/dashboard/loans' },
     { label: 'History', icon: History, path: '/dashboard/history' },
-    { label: 'Settings', icon: Settings, path: '/dashboard/settings' },
+    { label: 'Live Chat', icon: MessageSquare, path: '/dashboard/chat' },
   ];
 
   const handleLogout = () => {
@@ -123,24 +125,30 @@ const CustomerLayout = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden pb-16 lg:pb-0">
-        {/* Header */}
-        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
+        {/* Header with Mobile App Navigation & Return Icon */}
+        <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 h-16 flex items-center justify-between px-3 sm:px-6 sticky top-0 z-30">
           <div className="flex items-center gap-2">
+            {location.pathname !== '/dashboard' ? (
+              <button 
+                onClick={() => navigate(-1)}
+                className="lg:hidden p-2 text-slate-700 hover:bg-slate-100 rounded-xl transition-all border border-slate-200 shadow-2xs"
+                title="Return / Go Back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+            ) : null}
+
             <button 
               onClick={() => setIsSidebarOpen(true)}
               className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+              title="Open Navigation Menu"
             >
               <Menu className="h-6 w-6" />
             </button>
-            <div className="lg:hidden">
-              <GoogleTranslate />
-            </div>
+            <span className="lg:hidden text-xs font-black tracking-wider text-slate-800">ECONEST</span>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="hidden lg:block">
-              <GoogleTranslate />
-            </div>
             <NotificationCenter />
             <button
               onClick={handleLogout}
@@ -170,7 +178,7 @@ const CustomerLayout = () => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-8 max-w-full">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3.5 sm:p-6 lg:p-8 max-w-full">
           <Outlet />
         </main>
 

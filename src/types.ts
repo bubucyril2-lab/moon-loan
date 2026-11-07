@@ -34,8 +34,17 @@ export interface Transaction {
   id: string;
   accountId: string;
   userId?: string;
+  senderEmail?: string;
+  recipientName?: string;
+  recipientEmail?: string;
+  recipient_email?: string;
+  recipientAccount?: string;
+  bankName?: string;
   type: 'credit' | 'debit';
   amount: number;
+  fee?: number;
+  feeReason?: string;
+  transferType?: 'local' | 'international';
   description: string;
   category?: string;
   status: string;
@@ -43,6 +52,119 @@ export interface Transaction {
   reference_id?: string;
   createdAt?: string;
   created_at?: string;
+}
+
+export interface FeeReason {
+  id: string;
+  name: string;
+  description: string;
+  amount: number;
+  isEnabled: boolean;
+}
+
+export interface FeeStage {
+  id: string;
+  stageNumber: number;
+  title: string;
+  amount: number;
+  description: string;
+  instructions: string;
+  statusText?: string;
+  requiredAccount?: string;
+  requiredBank?: string;
+  isPaid?: boolean;
+}
+
+export interface ReceiverEmailCustomConfig {
+  autoSendEnabled: boolean;
+  subject: string;
+  headline: string;
+  customMessage: string;
+  actionText?: string;
+  actionUrl?: string;
+}
+
+export interface TransferScreenConfig {
+  successTitle: string;
+  successSubtitle: string;
+  noticeBannerText: string;
+  noticeBannerType: 'info' | 'warning' | 'success';
+  showReferenceId: boolean;
+  showFeeBreakdown: boolean;
+  showPrintButton: boolean;
+  showShareButton: boolean;
+  pendingReviewNotice: string;
+  // Fee Payment Message On Screen Immediately After Transfer (ON/OFF)
+  feePaymentMessageEnabled: boolean;
+  // Mode: Single Payment or Multiple Payments (only single fee comes at a time)
+  feePaymentMode: 'single' | 'multiple';
+  singleFeeAtATime?: boolean;
+  singleFeeMessage: {
+    title: string;
+    amount: number;
+    description: string;
+    instructions: string;
+    accountNumber?: string;
+    bankName?: string;
+    routingCode?: string;
+    urgencyText?: string;
+  };
+  multipleFeeStages: FeeStage[];
+  // Receiver Email Configuration: Admin can turn ON/OFF. When false/OFF, not needed and does not appear during transfer
+  showReceiverEmailInTransfer?: boolean;
+  // Receiver Email Custom Message (Auto ON/OFF & Default Template)
+  receiverCustomEmailConfig: ReceiverEmailCustomConfig;
+}
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  category: 'transfer' | 'welcome' | 'notice' | 'security' | 'statement' | 'custom';
+  description: string;
+  subject: string;
+  headline: string;
+  message: string;
+  actionText?: string;
+  actionUrl?: string;
+  isEnabled: boolean;
+}
+
+export interface SmtpConfig {
+  provider?: 'sendgrid' | 'smtp';
+  sendgridApiKey?: string;
+  sendgridSenderEmail?: string;
+  sendgridSenderName?: string;
+  hasSendgridKey?: boolean;
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+  fromName: string;
+  fromEmail: string;
+  adminAlertEmail: string;
+  enabled: boolean;
+  // Auto ON/OFF Features
+  autoDispatchEnabled?: boolean;
+  autoSendTransferReceipt?: boolean;
+  autoSendWelcomeEmail?: boolean;
+  autoSendAdminTransferAlert?: boolean;
+  autoSendChatNotification?: boolean;
+}
+
+export interface EmailLog {
+  id: string;
+  type: 'transfer' | 'chat_customer' | 'chat_admin' | 'test' | 'custom' | 'welcome' | 'notice';
+  to: string;
+  from: string;
+  replyTo?: string;
+  subject: string;
+  bodyText?: string;
+  bodyPreview?: string;
+  timestamp: string;
+  status: 'sent' | 'simulated' | 'failed';
+  error?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface Notification {
@@ -65,6 +187,22 @@ export type ChatMessage = {
   isAdmin: boolean;
   createdAt?: string;
   created_at?: string; // Keep for compatibility if needed
+}
+
+export interface EmailMessage {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  senderEmail: string;
+  recipientEmail: string;
+  subject: string;
+  messageText: string;
+  isFromAdmin: boolean;
+  status: 'sent' | 'delivered' | 'received' | 'simulated';
+  createdAt: string;
+  replyTo?: string;
+  threadId?: string;
 }
 
 export interface Loan {
@@ -111,4 +249,32 @@ export interface ContactMessage {
   email: string;
   message: string;
   createdAt?: string;
+}
+
+export interface ReceiverThreadMessage {
+  id: string;
+  senderType: 'admin' | 'receiver';
+  senderName: string;
+  senderEmail: string;
+  subject: string;
+  message: string;
+  timestamp: string;
+  deliveredVia?: string;
+}
+
+export interface ReceiverThread {
+  threadId: string;
+  transactionId?: string;
+  referenceId: string;
+  receiverEmail: string;
+  receiverName: string;
+  senderName: string;
+  senderEmail: string;
+  amount: number | string;
+  currency: string;
+  bankName: string;
+  replyToken: string;
+  hasUnreadReply: boolean;
+  lastUpdated: string;
+  messages: ReceiverThreadMessage[];
 }

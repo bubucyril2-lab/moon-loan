@@ -33,7 +33,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ items }) => {
           <Link
             key={item.path}
             to={item.path}
-            className={`flex flex-col items-center justify-center min-w-[64px] py-1 rounded-xl transition-all ${
+            className={`flex flex-col items-center justify-center flex-1 min-w-0 py-1 rounded-xl transition-all ${
               isActive 
                 ? 'text-emerald-600' 
                 : 'text-slate-400 hover:text-slate-600'
