@@ -704,7 +704,7 @@ const AdminSettings = () => {
           }`}
         >
           <Mail className="h-4 w-4 text-emerald-500" />
-          <span>SendGrid & Email Relay</span>
+          <span>SendGrid Email Gateway</span>
           <span className={`w-2 h-2 rounded-full ${smtpConfig.enabled ? 'bg-emerald-500 ring-2 ring-emerald-300' : 'bg-slate-400'}`}></span>
         </button>
       </div>

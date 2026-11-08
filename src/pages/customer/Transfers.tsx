@@ -1407,7 +1407,7 @@ Description: ${description || 'N/A'}
                               <span className="font-mono font-black text-slate-900 text-base">{selectedCurr.code}</span>
                               <span className="text-xs font-bold text-slate-500">({selectedCurr.symbol})</span>
                             </div>
-                            <p className="text-xs text-slate-500 font-medium truncate max-w-[170px] sm:max-w-[210px]">
+                            <p className="text-xs text-slate-500 font-medium break-words leading-tight">
                               {selectedCurr.name} • {selectedCurr.country}
                             </p>
                           </div>

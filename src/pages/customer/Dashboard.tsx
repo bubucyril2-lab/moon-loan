@@ -819,7 +819,7 @@ const CustomerDashboard = () => {
         </div>
 
         {/* Mobile & Tablet View: High-Visibility Transaction Cards (Zero Horizontal Scroll) */}
-        <div className="block lg:hidden space-y-3">
+        <div className="block xl:hidden space-y-3">
           {filteredTxs.slice(0, 10).map((tx) => {
             const isCredit = tx.type === 'credit';
             return (
@@ -875,7 +875,7 @@ const CustomerDashboard = () => {
         </div>
 
         {/* Desktop View: Transactions Table */}
-        <div className="hidden lg:block overflow-x-auto">
+        <div className="hidden xl:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider text-[10px]">

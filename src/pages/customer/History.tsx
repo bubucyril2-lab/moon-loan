@@ -144,7 +144,7 @@ const CustomerHistory = () => {
 
       <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden p-4 sm:p-0">
         {/* Mobile & Tablet View: Transaction Cards (Zero Horizontal Scroll) */}
-        <div className="block lg:hidden space-y-3">
+        <div className="block xl:hidden space-y-3">
           {isLoading ? (
             <div className="py-12 text-center">
               <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
@@ -192,7 +192,7 @@ const CustomerHistory = () => {
         </div>
 
         {/* Desktop View: Table */}
-        <div className="hidden lg:block overflow-x-auto">
+        <div className="hidden xl:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">

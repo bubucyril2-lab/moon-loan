@@ -410,8 +410,8 @@ const AdminDashboard = () => {
           </div>
         ) : (
           <div className="min-w-0">
-            {/* 1. Mobile & Tablet Card View (< 1024px, Zero Horizontal Scroll) */}
-            <div className="divide-y divide-slate-100 lg:hidden min-w-0">
+            {/* 1. Mobile & Tablet Card View (< 1280px, Zero Horizontal Scroll) */}
+            <div className="divide-y divide-slate-100 xl:hidden min-w-0">
               {recentTransfers.map((tx) => {
                 const senderUser = tx.userId ? customersMap[tx.userId] : null;
                 const displayEmail = tx.senderEmail || senderUser?.email || 'customer@econestbank.com';
@@ -473,8 +473,8 @@ const AdminDashboard = () => {
               })}
             </div>
 
-            {/* 2. Desktop Table View (>= 1024px) */}
-            <div className="hidden lg:block overflow-x-auto">
+            {/* 2. Desktop Table View (>= 1280px) */}
+            <div className="hidden xl:block overflow-x-auto">
               <table className="w-full text-left text-xs sm:text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/70 text-slate-500 font-bold uppercase text-[10px] tracking-wider">

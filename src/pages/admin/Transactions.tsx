@@ -324,9 +324,9 @@ const AdminTransactions = () => {
           </div>
         )}
 
-        {/* 1. MOBILE & TABLET CARD VIEW (Visible on screens < 1024px - Zero Horizontal Scroll) */}
+        {/* 1. MOBILE & TABLET CARD VIEW (Visible on screens < 1280px - Zero Horizontal Scroll) */}
         {!isLoading && filteredTransactions.length > 0 && (
-          <div className="divide-y divide-slate-100 lg:hidden">
+          <div className="divide-y divide-slate-100 xl:hidden">
             {filteredTransactions.map((tx) => (
               <div key={tx.id} className="p-3.5 sm:p-5 space-y-3 hover:bg-slate-50/60 transition-colors min-w-0">
                 {/* Card Header: Sender Info & Amount */}
@@ -430,23 +430,45 @@ const AdminTransactions = () => {
 
                 {/* Action Button: 100% visible, inside card, no horizontal scroll */}
                 <div className="pt-1 flex items-center justify-end">
-                  <button
-                    type="button"
-                    onClick={() => openMessageReceiverModal(tx)}
-                    className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all inline-flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-600/20 active:scale-95 cursor-pointer"
-                  >
-                    <MessageSquare className="h-4 w-4 text-indigo-200 shrink-0" />
-                    <span>Message Receiver</span>
-                  </button>
+                  {(() => {
+                    const thread = receiverThreads.find(t => 
+                      t.referenceId === tx.reference_id || 
+                      (tx.recipient_email && t.receiverEmail.toLowerCase() === tx.recipient_email.toLowerCase())
+                    );
+                    const msgCount = thread?.messages?.length || 0;
+                    const hasUnread = thread?.hasUnreadReply;
+
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => openMessageReceiverModal(tx)}
+                        className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold transition-all inline-flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer ${
+                          hasUnread
+                            ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/30'
+                            : msgCount > 0
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+                              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
+                        }`}
+                      >
+                        <MessageSquare className="h-4 w-4 shrink-0" />
+                        <span>{msgCount > 0 ? `SendGrid Desk (${msgCount})` : 'Message Receiver'}</span>
+                        {hasUnread && (
+                          <span className="ml-1 px-1.5 py-0.2 rounded bg-white text-rose-600 text-[10px] font-black animate-pulse">
+                            New Reply!
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* 2. DESKTOP TABLE VIEW (Visible only on lg screens >= 1024px) */}
+        {/* 2. DESKTOP TABLE VIEW (Visible on xl screens >= 1280px with sticky action column) */}
         {!isLoading && filteredTransactions.length > 0 && (
-          <div className="hidden lg:block overflow-x-auto">
+          <div className="hidden xl:block overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs sm:text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
@@ -456,7 +478,7 @@ const AdminTransactions = () => {
                   <th className="px-5 py-4">Fee & Reason</th>
                   <th className="px-5 py-4">Reference ID</th>
                   <th className="px-5 py-4">Date & Status</th>
-                  <th className="px-5 py-4 text-right">Receiver Action</th>
+                  <th className="px-5 py-4 text-right sticky right-0 bg-slate-50 z-10 shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.06)]">Receiver Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -563,8 +585,8 @@ const AdminTransactions = () => {
                       </span>
                     </td>
 
-                    {/* Message Receiver Action Column */}
-                    <td className="px-5 py-4 text-right whitespace-nowrap">
+                    {/* Message Receiver Action Column - Sticky Anchored to right */}
+                    <td className="px-5 py-4 text-right whitespace-nowrap sticky right-0 bg-white z-10 shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.06)]">
                       {(() => {
                         const thread = receiverThreads.find(t => 
                           t.referenceId === tx.reference_id || 
@@ -660,7 +682,7 @@ const AdminTransactions = () => {
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Transaction Ref</p>
-                <p className="font-mono font-bold text-slate-800 truncate">#{activeMsgTx.reference_id}</p>
+                <p className="font-mono font-bold text-slate-800 break-all">#{activeMsgTx.reference_id}</p>
               </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Settled Amount</p>
@@ -668,7 +690,7 @@ const AdminTransactions = () => {
               </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Originating Sender</p>
-                <p className="font-mono font-bold text-slate-700 truncate">{activeMsgTx.sender_email}</p>
+                <p className="font-mono font-bold text-slate-700 break-all">{activeMsgTx.sender_email}</p>
               </div>
             </div>
 
@@ -680,7 +702,7 @@ const AdminTransactions = () => {
                     <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
                     <span>Recipient Direct Response Portal Link:</span>
                   </p>
-                  <p className="font-mono text-[11px] text-indigo-800 truncate">
+                  <p className="font-mono text-[11px] text-indigo-800 break-all">
                     {window.location.origin}/reply/{activeThread.threadId}?token={activeThread.replyToken}
                   </p>
                 </div>
