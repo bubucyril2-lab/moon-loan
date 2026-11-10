@@ -45,6 +45,7 @@ const AdminLayout = () => {
     { icon: LayoutDashboard, label: 'Overview', path: '/admin' },
     { icon: Users, label: 'Customers', path: '/admin/customers' },
     { icon: ArrowRightLeft, label: 'Transactions', path: '/admin/transactions' },
+    { icon: Mail, label: 'Email Chat Space', path: '/admin/email-chat' },
     { icon: Banknote, label: 'Loan Requests', path: '/admin/loans' },
     { icon: Wallet, label: 'Payment Methods', path: '/admin/payment-methods' },
     { icon: MessageSquare, label: 'Support Live Chat', path: '/admin/chat' },
@@ -53,7 +54,7 @@ const AdminLayout = () => {
 
   const bottomNavItems = [
     { label: 'Overview', icon: LayoutDashboard, path: '/admin' },
-    { label: 'Customers', icon: Users, path: '/admin/customers' },
+    { label: 'Email Chat', icon: Mail, path: '/admin/email-chat' },
     { label: 'Transfers', icon: ArrowRightLeft, path: '/admin/transactions' },
     { label: 'Live Chat', icon: MessageSquare, path: '/admin/chat' },
     { label: 'Settings', icon: Settings, path: '/admin/settings' },

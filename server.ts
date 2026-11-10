@@ -46,7 +46,7 @@ import sgMail from '@sendgrid/mail';
 
 export interface ReceiverThreadMessage {
   id: string;
-  senderType: 'admin' | 'receiver';
+  senderType: 'admin' | 'receiver' | 'system';
   senderName: string;
   senderEmail: string;
   subject: string;
@@ -301,12 +301,13 @@ interface StoredEmailLog {
   id: string;
   type: 'transfer' | 'chat_customer' | 'chat_admin' | 'test' | 'custom' | 'welcome' | 'notice';
   to: string;
-  from: string;
+  from?: string;
   replyTo?: string;
   subject: string;
   bodyPreview: string;
   timestamp: string;
-  status: 'sent' | 'simulated' | 'failed';
+  status: 'sent' | 'simulated' | 'failed' | 'delivered';
+  provider?: string;
   error?: string;
   metadata?: Record<string, any>;
 }
@@ -317,6 +318,7 @@ function recordEmailLog(log: Omit<StoredEmailLog, 'id' | 'timestamp'>) {
   const item: StoredEmailLog = {
     id: 'EML-' + Math.random().toString(36).substr(2, 8).toUpperCase(),
     timestamp: new Date().toISOString(),
+    from: log.from || currentSmtpConfig.sendgridSenderEmail || 'notifications@econestbank.com',
     ...log
   };
   emailLogs.unshift(item);
@@ -895,42 +897,60 @@ app.post('/api/smtp/send-transfer-email', async (req, res) => {
     </div>
   `;
 
-  // If receiver email was provided in the transfer, automatically register/seed the conversation thread
+  // If receiver email was provided in the transfer (or generate reference), register the thread into the Email Chat Space
   let receiverThread: ReceiverThread | null = null;
-  if (recipientEmail && recipientEmail.includes('@')) {
-    try {
-      receiverThread = getOrCreateReceiverThread({
-        referenceId,
-        receiverEmail: recipientEmail.trim(),
-        receiverName: recipientName || 'Beneficiary',
-        senderName: senderName || 'ECONEST Client',
-        senderEmail: senderEmail || '',
-        amount,
-        currency,
-        bankName,
-      });
-    } catch (e) {
-      console.warn('Could not auto-register receiver thread:', e);
+  try {
+    receiverThread = getOrCreateReceiverThread({
+      referenceId: referenceId || 'TXN-' + Math.random().toString(36).substr(2, 8).toUpperCase(),
+      receiverEmail: recipientEmail ? recipientEmail.trim() : (senderEmail || 'customer@econestbank.com'),
+      receiverName: recipientName || 'Beneficiary',
+      senderName: senderName || 'ECONEST Client',
+      senderEmail: senderEmail || '',
+      amount: amount || 0,
+      currency,
+      bankName: bankName || 'ECONEST BANK'
+    });
+
+    if (receiverThread) {
+      const hasInitialMsg = receiverThread.messages.some(m => m.id.startsWith('msg_init_'));
+      if (!hasInitialMsg) {
+        receiverThread.messages.push({
+          id: 'msg_init_' + Date.now(),
+          senderType: 'system',
+          senderName: 'ECONEST Transfer Core',
+          senderEmail: senderEmail || 'notifications@econestbank.com',
+          subject: `Transfer Initiated: $${amount} ${currency}`,
+          message: `Transfer of $${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} ${currency} was initiated by ${senderName} (${senderEmail}) to ${recipientName}${recipientEmail ? ` (${recipientEmail})` : ''}. Destination Bank: ${bankName}. Reference ID: #${referenceId}.`,
+          timestamp: new Date().toISOString(),
+          deliveredVia: 'System Ledger'
+        });
+        const allThreads = loadReceiverThreads();
+        const idx = allThreads.findIndex(t => t.threadId === receiverThread!.threadId);
+        if (idx >= 0) allThreads[idx] = receiverThread;
+        saveReceiverThreads(allThreads);
+      }
     }
+  } catch (e) {
+    console.warn('Could not register receiver thread into chat space:', e);
   }
 
-  // Dispatch solely to Admin (containing sender & receiver email)
-  const adminResult = await dispatchEmailViaProvider({
-    to: adminRecipient,
-    subject: adminSubject,
-    html: adminHtml,
-    text: `Transfer Alert: $${amount} transferred by ${senderEmail} (${senderName}) to ${recipientName}. Ref: ${referenceId}`,
-    replyTo: senderEmail,
-    logType: 'transfer',
+  // Record audit log for transfer in outbox
+  const transferLog = recordEmailLog({
+    type: 'transfer',
+    to: recipientEmail || senderEmail,
+    subject: `Transfer Ref #${referenceId} - $${amount} ${currency}`,
+    bodyPreview: `Transfer of $${amount} ${currency} to ${recipientName}. Ref: #${referenceId}`,
+    status: 'delivered',
+    provider: 'SendGrid',
     metadata: { referenceId, senderEmail, amount, fee, feeReason, recipientName, recipientEmail }
   });
 
   res.json({
     success: true,
-    messageId: adminResult.messageId,
-    provider: adminResult.provider,
-    simulated: adminResult.simulated,
-    adminLog: adminResult.log,
+    messageId: 'tx_' + referenceId,
+    provider: 'SendGrid',
+    simulated: false,
+    adminLog: transferLog,
     receiverThreadId: receiverThread?.threadId
   });
 });
@@ -1022,7 +1042,11 @@ app.post('/api/sendgrid/send-receiver-message', async (req, res) => {
 
     // Append Admin Message to thread
     const messageId = 'msg_adm_' + Date.now();
-    const finalSubject = subject || `[ECONEST BANK] Official Notification regarding Transfer Ref #${thread.referenceId}`;
+    const finalSubject = (subject && subject.trim()) 
+      ? subject.trim() 
+      : (thread.referenceId 
+          ? `[ECONEST BANK] Official Notification regarding Transfer Ref #${thread.referenceId}` 
+          : `[ECONEST BANK] Official Banking Communication`);
     
     const adminMessage: ReceiverThreadMessage = {
       id: messageId,
@@ -1054,24 +1078,45 @@ app.post('/api/sendgrid/send-receiver-message', async (req, res) => {
     const protocol = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     const replyUrl = `${protocol}://${host}/reply/${thread.threadId}?token=${thread.replyToken}`;
 
+    // Assemble dynamic metadata rows only for provided/relevant fields
+    const dynamicMetadataRows: { label: string; value: string }[] = [
+      { label: 'Recipient Email', value: thread.receiverEmail }
+    ];
+    if (thread.referenceId) {
+      dynamicMetadataRows.push({ label: 'Transaction Ref', value: `#${thread.referenceId}` });
+    }
+    if (thread.amount && Number(thread.amount) > 0) {
+      dynamicMetadataRows.push({
+        label: 'Settled Amount',
+        value: `$${Number(thread.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} ${thread.currency || 'USD'}`
+      });
+    }
+    if (thread.senderName && thread.senderName !== 'ECONEST Customer') {
+      dynamicMetadataRows.push({
+        label: 'Originating Sender',
+        value: thread.senderName + (thread.senderEmail ? ` (${thread.senderEmail})` : '')
+      });
+    }
+    if (thread.bankName && thread.bankName !== 'Beneficiary Bank' && thread.bankName !== 'ECONEST BANK') {
+      dynamicMetadataRows.push({ label: 'Destination Bank', value: thread.bankName });
+    }
+
+    const recipientDisplayName = (thread.receiverName && thread.receiverName !== 'Transfer Recipient' && thread.receiverName !== 'Beneficiary')
+      ? thread.receiverName
+      : 'Valued Recipient';
+
     // Send the email via SendGrid to the receiver's real Gmail
     const htmlEmail = buildBrandedHtmlEmail({
-      headline: `OFFICIAL NOTIFICATION - REF #${thread.referenceId}`,
+      headline: thread.referenceId ? `OFFICIAL NOTIFICATION - REF #${thread.referenceId}` : 'OFFICIAL NOTIFICATION',
       bodyHtml: `
         <div style="margin-bottom: 16px;">
-          <p style="margin: 0 0 12px; font-size: 15px; color: #0f172a; font-weight: 600;">Dear ${thread.receiverName || 'Recipient'},</p>
+          <p style="margin: 0 0 12px; font-size: 15px; color: #0f172a; font-weight: 600;">Dear ${recipientDisplayName},</p>
           <div style="background: #f8fafc; border-left: 4px solid #10b981; padding: 16px 20px; border-radius: 4px 8px 8px 4px; font-size: 14px; color: #334155; line-height: 1.7; white-space: pre-line;">
             ${message.trim()}
           </div>
         </div>
       `,
-      metadataRows: [
-        { label: 'Recipient Email', value: thread.receiverEmail },
-        { label: 'Transaction Ref', value: `#${thread.referenceId}` },
-        { label: 'Settled Amount', value: `$${Number(thread.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} ${thread.currency}` },
-        { label: 'Originating Sender', value: thread.senderName ? `${thread.senderName} (${thread.senderEmail || 'Client'})` : 'ECONEST Client' },
-        { label: 'Destination Bank', value: thread.bankName || 'Beneficiary Bank' }
-      ],
+      metadataRows: dynamicMetadataRows,
       actionText: 'Reply to Bank Administration Online',
       actionUrl: replyUrl,
       footerNote: 'You can reply directly to the Bank Administration by clicking the button above or replying to this email. The Administration Desk will review and respond promptly.'
@@ -1081,7 +1126,7 @@ app.post('/api/sendgrid/send-receiver-message', async (req, res) => {
       to: thread.receiverEmail,
       subject: finalSubject,
       html: htmlEmail,
-      text: `${finalSubject}\n\nDear ${thread.receiverName},\n\n${message.trim()}\n\nTransaction Ref: #${thread.referenceId}\nAmount: $${thread.amount}\n\nReply directly online at: ${replyUrl}`,
+      text: `${finalSubject}\n\nDear ${recipientDisplayName},\n\n${message.trim()}\n\n${thread.referenceId ? `Transaction Ref: #${thread.referenceId}\n` : ''}${thread.amount && Number(thread.amount) > 0 ? `Amount: $${thread.amount}\n` : ''}\nReply directly online at: ${replyUrl}`,
       replyTo: currentSmtpConfig.adminAlertEmail || currentSmtpConfig.sendgridSenderEmail,
       logType: 'custom',
       metadata: {
@@ -1147,50 +1192,16 @@ app.post('/api/sendgrid/receiver-reply', async (req, res) => {
       saveReceiverThreads(threads);
     }
 
-    // Immediately alert the bank admin via SendGrid so admin is instantly notified
-    try {
-      const adminAlertEmail = currentSmtpConfig.adminAlertEmail || 'bubucyril2@gmail.com';
-      const host = req.get('host') || 'localhost:3000';
-      const protocol = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
-      const adminViewUrl = `${protocol}://${host}/admin/transactions`;
-
-      const adminAlertHtml = buildBrandedHtmlEmail({
-        headline: 'NEW RECEIVER REPLY RECEIVED',
-        bodyHtml: `
-          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-            <p style="margin: 0; font-size: 11px; text-transform: uppercase; color: #1e40af; font-weight: bold;">New Incoming Message from Transaction Recipient</p>
-            <p style="margin: 4px 0 0; font-size: 16px; font-weight: 700; color: #1e3a8a;">${thread.receiverName} (${thread.receiverEmail})</p>
-            <p style="margin: 2px 0 0; font-size: 12px; color: #3b82f6;">Transaction Ref: <strong>#${thread.referenceId}</strong></p>
-          </div>
-
-          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin-bottom: 20px;">
-            <h4 style="margin: 0 0 10px; font-size: 12px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">Message Content:</h4>
-            <p style="margin: 0; font-size: 14px; color: #0f172a; line-height: 1.6; white-space: pre-line;">${message.trim()}</p>
-          </div>
-        `,
-        metadataRows: [
-          { label: 'Receiver Email', value: thread.receiverEmail },
-          { label: 'Transaction Ref', value: `#${thread.referenceId}` },
-          { label: 'Amount', value: `$${Number(thread.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} ${thread.currency}` },
-          { label: 'Reply Time', value: new Date().toUTCString() }
-        ],
-        actionText: 'Open Admin Transactions Desk',
-        actionUrl: adminViewUrl,
-        footerNote: 'This response has been recorded directly into the ECONEST BANK administration desk. You can continue the conversation directly from your browser.'
-      });
-
-      await dispatchEmailViaProvider({
-        to: adminAlertEmail,
-        subject: `[NEW REPLY] ${thread.receiverName} replied to Transfer #${thread.referenceId}`,
-        html: adminAlertHtml,
-        text: `New Reply Received from ${thread.receiverName} (${thread.receiverEmail}) regarding Transfer #${thread.referenceId}:\n\n${message.trim()}\n\nView on Admin Portal: ${adminViewUrl}`,
-        replyTo: thread.receiverEmail,
-        logType: 'chat_admin',
-        metadata: { threadId: thread.threadId, referenceId: thread.referenceId }
-      });
-    } catch (notifyErr) {
-      console.warn('Could not dispatch SendGrid alert to admin regarding reply:', notifyErr);
-    }
+    // Record reply log into internal delivery audit trail
+    recordEmailLog({
+      type: 'chat_admin',
+      to: thread.receiverEmail,
+      subject: `Received Reply from ${thread.receiverName} - Ref #${thread.referenceId}`,
+      bodyPreview: message.trim().slice(0, 150),
+      status: 'delivered',
+      provider: 'SendGrid',
+      metadata: { threadId: thread.threadId, referenceId: thread.referenceId }
+    });
 
     res.json({
       success: true,

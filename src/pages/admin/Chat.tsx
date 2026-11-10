@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { Search, User, Send, MessageSquare, ShieldCheck, Loader2, ArrowLeft, X, Mail, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../hooks/useChat';
@@ -59,7 +60,24 @@ const AdminChat = () => {
   );
 
   return (
-    <div className="h-[calc(100vh-15.5rem)] md:h-[calc(100vh-12rem)] flex flex-col md:flex-row gap-4 md:gap-8">
+    <div className="space-y-4">
+      {/* Top Communication Desk Switcher */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-200/80 rounded-2xl w-fit border border-slate-300/60 shadow-2xs">
+        <Link
+          to="/admin/email-chat"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-white/60 transition-all"
+        >
+          <Mail className="h-4 w-4 text-emerald-600" />
+          <span>SendGrid Email Chat Space</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        </Link>
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-900 shadow-sm">
+          <MessageSquare className="h-4 w-4 text-indigo-600" />
+          <span>Customer Live Support</span>
+        </div>
+      </div>
+
+      <div className="h-[calc(100vh-19rem)] md:h-[calc(100vh-15rem)] min-h-[480px] flex flex-col md:flex-row gap-4 md:gap-8">
       {/* Customer List */}
       <div className={`${selectedCustomer ? 'hidden md:flex' : 'flex'} w-full md:w-80 bg-white border border-slate-200 rounded-3xl flex-col overflow-hidden shadow-sm`}>
         <div className="p-6 border-b border-slate-100">
@@ -203,6 +221,7 @@ const AdminChat = () => {
         )}
       </div>
     </div>
+  </div>
   );
 };
 

@@ -2259,35 +2259,6 @@ const AdminSettings = () => {
                   </p>
                 </div>
 
-                {/* Admin Notification Destination Mailbox */}
-                <div className="md:col-span-2 bg-indigo-50/70 p-5 rounded-2xl border border-indigo-200/80 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
-                      <Bell className="h-4 w-4 text-indigo-600" />
-                      Admin Notification Destination Mailbox
-                    </label>
-                    <span className="text-[10px] bg-indigo-200/70 text-indigo-900 font-bold px-2 py-0.5 rounded">
-                      Admin Inbox
-                    </span>
-                  </div>
-                  <input
-                    type="email"
-                    value={smtpConfig.adminAlertEmail}
-                    onChange={(e) => {
-                      setSmtpConfig({ ...smtpConfig, adminAlertEmail: e.target.value });
-                      setTestEmailAddress(e.target.value);
-                    }}
-                    className="w-full p-3.5 bg-white border border-indigo-200 rounded-xl text-sm font-bold text-indigo-950 focus:outline-none focus:border-indigo-600 shadow-xs"
-                    placeholder="e.g. bubucyril2@gmail.com"
-                    required
-                  />
-                  <p className="text-[11px] text-indigo-800 leading-relaxed">
-                    ✓ When a customer submits a transfer, an automated alert is delivered here via SendGrid with sender details, transfer amount, reference ID, and the receiver email used.
-                    <br />
-                    ✓ You can then send messages directly to the receiver via the Admin Transactions desk, and see their replies in real time.
-                  </p>
-                </div>
-
                 {/* SendGrid Save & Activate Button Card */}
                 <div className="col-span-full mt-2 p-5 bg-gradient-to-r from-emerald-50 via-teal-50 to-sky-50 rounded-2xl border-2 border-emerald-300 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-1">
@@ -2462,20 +2433,20 @@ const AdminSettings = () => {
               <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center">1</span>
-                  <h4 className="text-sm font-bold text-slate-900">Customer Transfer Alert to Admin</h4>
+                  <h4 className="text-sm font-bold text-slate-900">Automatic Feed in Email Chat Space</h4>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Every customer transfer sends a real-time notification to <strong>{smtpConfig.adminAlertEmail || 'bubucyril2@gmail.com'}</strong> containing the transfer amount, customer details, and the receiver's email address.
+                  Every customer transfer automatically seeds an official thread in the <strong>Email Chat Space</strong> displaying the sender details, transfer amount, reference ID, and receiver email.
                 </p>
               </div>
 
               <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-800 font-bold text-xs flex items-center justify-center">2</span>
-                  <h4 className="text-sm font-bold text-slate-900">Direct Message to Receiver's Real Gmail</h4>
+                  <h4 className="text-sm font-bold text-slate-900">Direct SendGrid Chat & Receive</h4>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  From the Admin Transactions ledger, click <strong>"Message Receiver"</strong> next to any transfer to compose and dispatch official messages straight to the receiver's real Gmail inbox via SendGrid.
+                  Write messages directly in the <strong>Email Chat Space</strong> to dispatch official emails via SendGrid to the recipient's real Gmail. When the recipient replies, their message appears live as a chat bubble!
                 </p>
               </div>
             </div>

@@ -35,6 +35,7 @@ import AdminLoans from './pages/admin/Loans';
 import AdminSettings from './pages/admin/Settings';
 import AdminAuditLogs from './pages/admin/AuditLogs';
 import AdminPaymentMethods from './pages/admin/PaymentMethods';
+import AdminEmailChatSpace from './pages/admin/EmailChatSpace';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import AutoTranslateNotification from './components/common/AutoTranslateNotification';
 
@@ -112,6 +113,7 @@ export default function App() {
               <Route index element={<AdminDashboard />} />
               <Route path="customers" element={<AdminCustomers />} />
               <Route path="transactions" element={<AdminTransactions />} />
+              <Route path="email-chat" element={<AdminEmailChatSpace />} />
               <Route path="chat" element={<AdminChat />} />
               <Route path="loans" element={<AdminLoans />} />
               <Route path="settings" element={<AdminSettings />} />

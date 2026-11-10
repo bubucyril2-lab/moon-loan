@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Search, 
   Filter, 
@@ -657,11 +658,18 @@ const AdminTransactions = () => {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Link
+                  to={activeThread ? `/admin/email-chat?threadId=${activeThread.threadId}` : '/admin/email-chat'}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-xs"
+                >
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  <span>Open Full Chat Space ↗</span>
+                </Link>
                 <button
                   type="button"
                   onClick={() => setActiveMsgTx(null)}
-                  className="px-2.5 py-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all flex items-center gap-1 text-xs font-bold"
+                  className="px-2.5 py-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all flex items-center gap-1 text-xs font-bold cursor-pointer"
                   title="Return to Transactions List"
                 >
                   <ArrowLeft className="h-4 w-4" />
@@ -793,28 +801,30 @@ const AdminTransactions = () => {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Receiver Display Name
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+                    <span>Receiver Display Name</span>
+                    <span className="text-[10px] text-slate-400 font-semibold lowercase">optional</span>
                   </label>
                   <input
                     type="text"
                     value={receiverNameInput}
                     onChange={(e) => setReceiverNameInput(e.target.value)}
-                    placeholder="Full Name"
+                    placeholder="Full Name (Optional)"
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Email Subject *
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+                  <span>Email Subject</span>
+                  <span className="text-[10px] text-slate-400 font-semibold lowercase">optional</span>
                 </label>
                 <input
                   type="text"
-                  required
                   value={msgSubject}
                   onChange={(e) => setMsgSubject(e.target.value)}
+                  placeholder="Official Update regarding Wire Transfer (Optional)"
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500 font-medium"
                 />
               </div>

@@ -253,7 +253,7 @@ export interface ContactMessage {
 
 export interface ReceiverThreadMessage {
   id: string;
-  senderType: 'admin' | 'receiver';
+  senderType: 'admin' | 'receiver' | 'system';
   senderName: string;
   senderEmail: string;
   subject: string;

@@ -642,9 +642,12 @@ const AdminDashboard = () => {
 
           <div className="space-y-2.5 text-xs min-w-0">
             <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 min-w-0">
-              <p className="text-[10px] uppercase font-bold text-emerald-800">Admin Notification Mailbox:</p>
-              <p className="font-mono font-bold text-emerald-950 break-all mt-0.5">
-                {smtpConfig?.adminAlertEmail || 'bubucyril2@gmail.com'}
+              <p className="text-[10px] uppercase font-bold text-emerald-800">Two-Way Email Chat Space:</p>
+              <p className="font-bold text-emerald-950 mt-0.5">
+                Live Messaging Desk Connected
+              </p>
+              <p className="text-[11px] text-emerald-700 mt-0.5">
+                Real-time SendGrid email dispatch & 2-way recipient responses.
               </p>
             </div>
 
@@ -655,16 +658,24 @@ const AdminDashboard = () => {
 
             <div className="flex items-center justify-between text-slate-600 py-1 gap-2">
               <span className="shrink-0">Two-Way Receiver Desk:</span>
-              <span className="font-bold text-emerald-600 shrink-0">Online</span>
+              <span className="font-bold text-emerald-600 shrink-0">Online & Ready</span>
             </div>
           </div>
 
-          <Link
-            to="/admin/settings"
-            className="block text-center py-2.5 bg-emerald-50 hover:bg-emerald-100 rounded-xl text-xs font-bold text-emerald-700 transition-colors border border-emerald-200"
-          >
-            Manage SendGrid Settings
-          </Link>
+          <div className="space-y-2">
+            <Link
+              to="/admin/email-chat"
+              className="block text-center py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-emerald-600/20"
+            >
+              Open Email Chat Space
+            </Link>
+            <Link
+              to="/admin/settings"
+              className="block text-center py-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-xs font-semibold text-slate-700 transition-colors border border-slate-200"
+            >
+              Manage SendGrid API Settings
+            </Link>
+          </div>
         </div>
 
         {/* Card 3: Broadcast Quick Announcement */}
