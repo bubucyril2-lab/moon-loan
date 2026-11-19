@@ -34,7 +34,11 @@ class FirebaseAuthService {
       username: userData.username || userData.email.split('@')[0],
       fullName: userData.fullName || 'New User',
       role: 'customer',
-      status: 'pending',
+      status: userData.status || 'active',
+      ...(userData.profilePicture ? { profilePicture: userData.profilePicture } : {}),
+      ...(userData.country ? { country: userData.country } : {}),
+      ...(userData.city ? { city: userData.city } : {}),
+      ...(userData.age !== undefined && !Number.isNaN(userData.age) ? { age: userData.age } : {}),
       createdAt: new Date().toISOString()
     };
 

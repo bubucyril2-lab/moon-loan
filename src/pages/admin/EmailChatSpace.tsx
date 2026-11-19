@@ -22,7 +22,10 @@ import {
   Plus,
   Loader2,
   Building,
-  CheckCheck
+  CheckCheck,
+  Lock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSearchParams, Link } from 'react-router-dom';
@@ -61,7 +64,25 @@ export const EmailChatSpace: React.FC = () => {
   const [newMessage, setNewMessage] = useState('');
   const [isCreatingThread, setIsCreatingThread] = useState(false);
 
+  // Password Gate State (Required: da12345)
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [showPasswordChars, setShowPasswordChars] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleUnlockEmailSpace = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === 'da12345') {
+      setIsUnlocked(true);
+      setPasswordInput('');
+      setPasswordError('');
+      toast.success('Email chat space unlocked');
+    } else {
+      setPasswordError('Incorrect password. Please try again.');
+    }
+  };
 
   // Auto-scroll to bottom of chat
   const scrollToBottom = () => {
@@ -104,14 +125,15 @@ export const EmailChatSpace: React.FC = () => {
     }
   };
 
-  // Initial load
+  // Initial load once unlocked
   useEffect(() => {
+    if (!isUnlocked) return;
     fetchThreads();
     const interval = setInterval(() => {
       fetchThreads(true);
     }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isUnlocked]);
 
   // When selected thread changes, mark as read and update subject
   const handleSelectThread = (thread: ReceiverThread) => {
@@ -268,6 +290,67 @@ export const EmailChatSpace: React.FC = () => {
 
   const unreadCount = threads.filter(t => t.hasUnreadReply).length;
 
+  if (!isUnlocked) {
+    return (
+      <div className="min-h-[540px] flex items-center justify-center p-4 sm:p-8 bg-slate-100 rounded-3xl border border-slate-200">
+        <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-xl overflow-hidden">
+          <div className="bg-slate-900 text-white px-6 py-5 flex items-center gap-3.5 border-b border-slate-800">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+              <Lock className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-black tracking-tight">Email Section Locked</h2>
+              <p className="text-xs text-slate-400">Enter password to open SendGrid Email Chat Space</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleUnlockEmailSpace} className="p-6 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                Access Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPasswordChars ? 'text' : 'password'}
+                  autoFocus
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    if (passwordError) setPasswordError('');
+                  }}
+                  placeholder="Enter password..."
+                  className="w-full p-3.5 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-500"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordChars(!showPasswordChars)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
+                >
+                  {showPasswordChars ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {passwordError && (
+                <p className="text-xs font-bold text-rose-600 flex items-center gap-1 pt-1">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{passwordError}</span>
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              <span>Unlock Email Section</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-[calc(100vh-8.5rem)] min-h-[580px] flex flex-col bg-slate-100 rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
       {/* Top Banner / Global Bar */}
@@ -291,6 +374,19 @@ export const EmailChatSpace: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setIsUnlocked(false);
+              toast.success('Email section locked');
+            }}
+            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 cursor-pointer"
+            title="Lock Email Section"
+          >
+            <Lock className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">Lock</span>
+          </button>
+
           <button
             type="button"
             onClick={() => fetchThreads(false)}

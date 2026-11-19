@@ -57,7 +57,7 @@ class EmailService {
         pass: '',
         fromName: 'ECONEST BANK Alert',
         fromEmail: 'notifications@econestbank.com',
-        adminAlertEmail: 'bubucyril2@gmail.com',
+        adminAlertEmail: 'alerts@econestbank.com',
         enabled: true,
       };
     }

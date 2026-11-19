@@ -124,6 +124,29 @@ const AdminPaymentMethods = () => {
     setShowModal(true);
   };
 
+  const handleToggleActive = async (method: PaymentMethod) => {
+    try {
+      const nextActive = method.is_active ? 0 : 1;
+      const updated = { ...method, is_active: nextActive };
+      setMethods(prev => prev.map(m => m.id === method.id ? updated : m));
+      await storageService.savePaymentMethod(updated);
+      if (user) {
+        storageService.saveAuditLog({
+          id: Math.random().toString(36).substr(2, 9),
+          adminId: user.id,
+          adminName: user.fullName || user.full_name || '',
+          action: 'payment_method_toggle',
+          details: `Turned payment method ${method.name} ${nextActive ? 'ON' : 'OFF'}`,
+          createdAt: new Date().toISOString()
+        }).catch(() => {});
+      }
+      toast.success(`${method.name} is now ${nextActive ? 'ON (Active)' : 'OFF (Paused)'} permanently`);
+    } catch {
+      toast.error('Failed to update payment method status');
+      fetchMethods();
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -159,7 +182,21 @@ const AdminPaymentMethods = () => {
               <div className={`p-3 rounded-xl ${method.type === 'bank' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
                 {method.type === 'bank' ? <Banknote className="h-6 w-6" /> : <Bitcoin className="h-6 w-6" />}
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleToggleActive(method)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                    method.is_active ? 'bg-emerald-600' : 'bg-slate-300'
+                  }`}
+                  title={method.is_active ? 'Turn OFF (hide from customers)' : 'Turn ON (show to customers)'}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
+                      method.is_active ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
                 <button 
                   onClick={() => handleEdit(method)}
                   className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
@@ -178,11 +215,11 @@ const AdminPaymentMethods = () => {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-slate-900">{method.name}</h3>
-                {method.is_active ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                ) : (
-                  <XCircle className="h-4 w-4 text-slate-300" />
-                )}
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                  method.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {method.is_active ? 'ON' : 'OFF'}
+                </span>
               </div>
               <p className="text-sm font-mono bg-slate-50 p-2 rounded-lg text-slate-600 break-all">
                 {method.details}

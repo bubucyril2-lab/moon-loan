@@ -559,27 +559,118 @@ class StorageService {
     }
   }
 
-  // Settings
+  // Settings (Dual-persisted in Firestore settings/global + /api/settings for zero-reset permanence)
   async getSettings(): Promise<any> {
+    let firestoreData: any = {};
+    let serverData: any = {};
+
     try {
       const settingsDoc = await getDoc(doc(db, 'settings', 'global'));
-      return settingsDoc.exists() ? settingsDoc.data() : {};
-    } catch (error) {
-      handleFirestoreError(error, OperationType.GET, 'settings/global');
-      return {};
+      if (settingsDoc.exists()) {
+        firestoreData = settingsDoc.data() || {};
+      }
+    } catch {
+      // Public/unauthenticated routes (like /register) or offline clients gracefully fall back to /api/settings
     }
+
+    try {
+      const resp = await fetch('/api/settings');
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json?.settings && typeof json.settings === 'object') {
+          serverData = json.settings;
+        }
+      }
+    } catch {
+      // Ignore network errors and rely on Firestore
+    }
+
+    const fsTime = firestoreData?.updatedAt ? new Date(firestoreData.updatedAt).getTime() : 0;
+    const srvTime = serverData?.updatedAt ? new Date(serverData.updatedAt).getTime() : 0;
+
+    // Prefer the newer saved snapshot so an explicit toggle never gets reverted by stale state
+    const merged = fsTime >= srvTime
+      ? { ...serverData, ...firestoreData }
+      : { ...firestoreData, ...serverData };
+
+    // If Firestore had newer settings after a server restart, rehydrate /api/settings silently
+    if (Object.keys(firestoreData).length > 0 && fsTime > srvTime) {
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(merged)
+      }).catch(() => {});
+    }
+
+    return merged;
   }
 
   async saveSettings(settings: any): Promise<void> {
+    const payload = {
+      ...settings,
+      updatedAt: settings.updatedAt || new Date().toISOString()
+    };
+
     try {
-      await setDoc(doc(db, 'settings', 'global'), settings);
+      await setDoc(doc(db, 'settings', 'global'), payload, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'settings/global');
+    }
+
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch {
+      // Non-blocking if backend disk write is temporarily unavailable; Firestore already succeeded
     }
   }
 
   async uploadFile(file: File, path: string): Promise<string> {
-    // Mock file upload: return a data URL since we don't have Firebase Storage set up
+    if (file.type.startsWith('image/')) {
+      try {
+        const compressed = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = reject;
+          reader.onload = () => {
+            const img = new Image();
+            img.onerror = reject;
+            img.onload = () => {
+              const isProfile = path.startsWith('profiles/');
+              const maxDim = isProfile ? 420 : 1024;
+              let { width, height } = img;
+              if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                  height = Math.round((height * maxDim) / width);
+                  width = maxDim;
+                } else {
+                  width = Math.round((width * maxDim) / height);
+                  height = maxDim;
+                }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) {
+                resolve(reader.result as string);
+                return;
+              }
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/jpeg', isProfile ? 0.82 : 0.78));
+            };
+            img.src = reader.result as string;
+          };
+          reader.readAsDataURL(file);
+        });
+        return compressed;
+      } catch {
+        // Fallback to raw FileReader below
+      }
+    }
+
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);

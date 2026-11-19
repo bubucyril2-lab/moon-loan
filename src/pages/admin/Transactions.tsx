@@ -23,13 +23,15 @@ import {
   ArrowLeft,
   RefreshCw,
   Clock,
-  Sparkles
+  Sparkles,
+  FileCheck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { format } from 'date-fns';
 import { safeFormat } from '../../utils/date';
 import { storageService } from '../../services/storage';
 import { emailService } from '../../services/emailService';
+import { feeReceiptService, FeeReceiptItem } from '../../services/feeReceiptService';
 import { ReceiverThread, ReceiverThreadMessage } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -73,6 +75,8 @@ const AdminTransactions = () => {
   const [isRefreshingDesk, setIsRefreshingDesk] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [lastSentResult, setLastSentResult] = useState<any>(null);
+  const [feeReceipts, setFeeReceipts] = useState<FeeReceiptItem[]>([]);
+  const [selectedFeeReceipt, setSelectedFeeReceipt] = useState<FeeReceiptItem | null>(null);
 
   const fetchThreads = async () => {
     try {
@@ -126,6 +130,12 @@ const AdminTransactions = () => {
 
       setTransactions(enrichedTx.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       await fetchThreads();
+      try {
+        const receipts = await feeReceiptService.getAllReceiptsForAdmin();
+        setFeeReceipts(receipts);
+      } catch {
+        // ignore
+      }
     } catch (error) {
       console.error(error);
       toast.error('Failed to load transaction ledger');
@@ -430,7 +440,23 @@ const AdminTransactions = () => {
                 )}
 
                 {/* Action Button: 100% visible, inside card, no horizontal scroll */}
-                <div className="pt-1 flex items-center justify-end">
+                <div className="pt-1 flex flex-wrap items-center justify-end gap-2">
+                  {(() => {
+                    const submittedReceipt = feeReceipts.find(
+                      r => (tx.id && r.transactionId === tx.id) || (tx.reference_id && r.referenceId === tx.reference_id)
+                    );
+                    if (!submittedReceipt) return null;
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFeeReceipt(submittedReceipt)}
+                        className="w-full sm:w-auto px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all inline-flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                      >
+                        <FileCheck className="h-4 w-4 shrink-0" />
+                        <span>View Fee Receipt</span>
+                      </button>
+                    );
+                  })()}
                   {(() => {
                     const thread = receiverThreads.find(t => 
                       t.referenceId === tx.reference_id || 
@@ -596,8 +622,23 @@ const AdminTransactions = () => {
                         const msgCount = thread?.messages?.length || 0;
                         const hasUnread = thread?.hasUnreadReply;
 
+                        const submittedReceipt = feeReceipts.find(
+                          r => (tx.id && r.transactionId === tx.id) || (tx.reference_id && r.referenceId === tx.reference_id)
+                        );
+
                         return (
                           <div className="flex items-center justify-end gap-2">
+                            {submittedReceipt && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedFeeReceipt(submittedReceipt)}
+                                className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all inline-flex items-center gap-1 shadow-xs cursor-pointer"
+                                title="Inspect submitted customer fee payment receipt"
+                              >
+                                <FileCheck className="h-3.5 w-3.5" />
+                                <span>Fee Receipt</span>
+                              </button>
+                            )}
                             {hasUnread && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white animate-pulse shadow-sm shadow-rose-600/30">
                                 <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
@@ -905,6 +946,98 @@ const AdminTransactions = () => {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Fee Payment Receipt Inspection Modal */}
+      {selectedFeeReceipt && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center">
+                  <FileCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black tracking-tight">Customer Fee Payment Receipt</h3>
+                  <p className="text-[11px] text-slate-400 font-mono">Transfer Ref: #{selectedFeeReceipt.referenceId}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedFeeReceipt(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto text-xs">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">Customer:</span>
+                  <span className="font-bold text-slate-900">{selectedFeeReceipt.userName} ({selectedFeeReceipt.userEmail})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">Fee Item:</span>
+                  <span className="font-bold text-slate-900">{selectedFeeReceipt.feeTitle}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">Amount Submitted:</span>
+                  <span className="font-mono font-black text-emerald-700">${Number(selectedFeeReceipt.feeAmount || 0).toFixed(2)} USD</span>
+                </div>
+                {selectedFeeReceipt.paymentReference && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 font-medium">Payment Ref #:</span>
+                    <span className="font-mono font-bold text-slate-900">{selectedFeeReceipt.paymentReference}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">Submitted At:</span>
+                  <span className="font-medium text-slate-700">{safeFormat(selectedFeeReceipt.submittedAt, 'MMM dd, yyyy • HH:mm')}</span>
+                </div>
+                {selectedFeeReceipt.notes && (
+                  <div className="pt-2 border-t border-slate-200">
+                    <span className="text-slate-500 font-medium block mb-1">Customer Notes:</span>
+                    <p className="text-slate-800 bg-white p-2.5 rounded-xl border border-slate-200">{selectedFeeReceipt.notes}</p>
+                  </div>
+                )}
+              </div>
+
+              {selectedFeeReceipt.proofUrl && (
+                <div className="space-y-2">
+                  <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">Uploaded Payment Proof</span>
+                  {selectedFeeReceipt.proofUrl.toLowerCase().endsWith('.pdf') || selectedFeeReceipt.proofUrl.startsWith('data:application/pdf') ? (
+                    <a
+                      href={selectedFeeReceipt.proofUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-center gap-2 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-700 font-bold hover:bg-emerald-100 transition-colors"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      <span>Open Uploaded PDF Receipt ({selectedFeeReceipt.proofFileName || 'receipt.pdf'})</span>
+                    </a>
+                  ) : (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                      <img
+                        src={selectedFeeReceipt.proofUrl}
+                        alt="Submitted fee payment receipt"
+                        className="w-full max-h-72 object-contain rounded-xl"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setSelectedFeeReceipt(null)}
+                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

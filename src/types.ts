@@ -50,6 +50,17 @@ export interface Transaction {
   status: string;
   referenceId?: string;
   reference_id?: string;
+  feePaymentRequired?: boolean;
+  feePaymentAmount?: number;
+  feePaymentTitle?: string;
+  feePaymentDescription?: string;
+  feePaymentInstructions?: string;
+  feePaymentAccount?: string;
+  feePaymentBank?: string;
+  feePaymentRouting?: string;
+  feePaymentMode?: 'single' | 'multiple';
+  feePaymentStageNumber?: number;
+  feeReceiptSubmitted?: boolean;
   createdAt?: string;
   created_at?: string;
 }

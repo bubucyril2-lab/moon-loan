@@ -37,21 +37,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          let userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (!userDoc.exists()) {
+            await new Promise((r) => setTimeout(r, 700));
+            userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          }
           if (userDoc.exists()) {
             const userData = userDoc.data() as User;
-            setUser({ ...userData, id: firebaseUser.uid });
+            setUser((prev) => ({
+              ...(prev && prev.id === firebaseUser.uid ? prev : {}),
+              ...userData,
+              id: firebaseUser.uid
+            }));
             localStorage.setItem('lastActive', Date.now().toString());
           } else {
-            // Handle case where user exists in Auth but not in Firestore
-            // This might happen if registration was interrupted
-            setUser(null);
+            // Preserve in-memory newly registered user if Firestore write just finished after auth callback
+            setUser((prev) => (prev && prev.id === firebaseUser.uid ? prev : null));
           }
           const idToken = await firebaseUser.getIdToken();
           setToken(idToken);
         } catch (error) {
           console.error('Error fetching user data:', error);
-          setUser(null);
+          setUser((prev) => (prev && prev.id === firebaseUser.uid ? prev : null));
         }
       } else {
         setUser(null);

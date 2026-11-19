@@ -38,6 +38,8 @@ import { storageService } from '../../services/storage';
 import { emailService } from '../../services/emailService';
 import { DEFAULT_FEE_REASONS, DEFAULT_TRANSFER_SCREEN_CONFIG } from '../../services/bankConfig';
 import { WORLD_CURRENCIES, CountryCurrency } from '../../data/currencies';
+import { feeReceiptService, FeeReceiptItem } from '../../services/feeReceiptService';
+import { FeeReceiptModal } from '../../components/common/FeeReceiptModal';
 
 const CustomerTransfers = () => {
   const { user } = useAuth();
@@ -62,7 +64,10 @@ const CustomerTransfers = () => {
   const [countdown, setCountdown] = useState(30);
   const [countdownPhase, setCountdownPhase] = useState(1);
   const [generatedRef, setGeneratedRef] = useState('');
+  const [generatedTxId, setGeneratedTxId] = useState('');
   const [generatedTime, setGeneratedTime] = useState('');
+  const [submittedReceipts, setSubmittedReceipts] = useState<FeeReceiptItem[]>([]);
+  const [isFeeReceiptModalOpen, setIsFeeReceiptModalOpen] = useState(false);
 
   const selectedCurr = WORLD_CURRENCIES.find(c => c.code === currency) || WORLD_CURRENCIES[0];
 
@@ -103,12 +108,22 @@ const CustomerTransfers = () => {
       }
     };
 
+    const parseBool = (val: any, fallback: boolean): boolean => {
+      if (val === undefined || val === null) return fallback;
+      if (typeof val === 'boolean') return val;
+      if (typeof val === 'number') return val !== 0;
+      const str = String(val).trim().toLowerCase();
+      if (str === 'false' || str === '0' || str === 'off' || str === 'no') return false;
+      if (str === 'true' || str === '1' || str === 'on' || str === 'yes') return true;
+      return fallback;
+    };
+
     const fetchSettings = async () => {
       try {
         const data = await storageService.getSettings();
         if (data) {
           if (data.fee_enabled !== undefined) {
-            setFeeEnabled(Boolean(data.fee_enabled));
+            setFeeEnabled(parseBool(data.fee_enabled, true));
           }
           if (data.fee_reasons) {
             try {
@@ -123,12 +138,28 @@ const CustomerTransfers = () => {
                 setTransferScreenConfig(prev => ({
                   ...prev,
                   ...parsed,
+                  feePaymentMessageEnabled: parsed.feePaymentMessageEnabled !== undefined
+                    ? parseBool(parsed.feePaymentMessageEnabled, prev.feePaymentMessageEnabled)
+                    : prev.feePaymentMessageEnabled,
+                  showReferenceId: parsed.showReferenceId !== undefined
+                    ? parseBool(parsed.showReferenceId, true)
+                    : prev.showReferenceId,
+                  showFeeBreakdown: parsed.showFeeBreakdown !== undefined
+                    ? parseBool(parsed.showFeeBreakdown, true)
+                    : prev.showFeeBreakdown,
                   showReceiverEmailInTransfer: parsed.showReceiverEmailInTransfer !== undefined
-                    ? Boolean(parsed.showReceiverEmailInTransfer)
+                    ? parseBool(parsed.showReceiverEmailInTransfer, false)
                     : false,
                   singleFeeAtATime: parsed.singleFeeAtATime !== undefined
-                    ? Boolean(parsed.singleFeeAtATime)
-                    : true
+                    ? parseBool(parsed.singleFeeAtATime, true)
+                    : true,
+                  receiverCustomEmailConfig: {
+                    ...prev.receiverCustomEmailConfig,
+                    ...(parsed.receiverCustomEmailConfig || {}),
+                    autoSendEnabled: parsed.receiverCustomEmailConfig?.autoSendEnabled !== undefined
+                      ? parseBool(parsed.receiverCustomEmailConfig.autoSendEnabled, true)
+                      : prev.receiverCustomEmailConfig.autoSendEnabled
+                  }
                 }));
               }
             } catch (e) {}
@@ -142,7 +173,12 @@ const CustomerTransfers = () => {
     const fetchAllData = async () => {
       setIsLoading(true);
       try {
-        await Promise.all([fetchAccount(), fetchBeneficiaries(), fetchSettings()]);
+        await Promise.all([
+          fetchAccount(),
+          fetchBeneficiaries(),
+          fetchSettings(),
+          user ? feeReceiptService.getReceiptsForUser(user.id).then(setSubmittedReceipts).catch(() => {}) : Promise.resolve()
+        ]);
       } finally {
         setIsLoading(false);
       }
@@ -215,6 +251,8 @@ const CustomerTransfers = () => {
       const refId = `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
       const nowIso = new Date().toISOString();
       setGeneratedRef(refId);
+      setGeneratedTxId('');
+      setFeeProofSubmitted(false);
       setGeneratedTime(nowIso);
       setCountdown(30);
       setCountdownPhase(1);
@@ -254,13 +292,44 @@ const CustomerTransfers = () => {
             const totalDebit = transferAmountInUsd + fee;
 
             if (account && user) {
+              const txId = Math.random().toString(36).substr(2, 9);
+              setGeneratedTxId(txId);
+
+              const hasPostTransferFee = Boolean(transferScreenConfig.feePaymentMessageEnabled);
+              const isMultiMode = transferScreenConfig.feePaymentMode === 'multiple';
+              const firstStage = transferScreenConfig.multipleFeeStages?.[0];
+              const singleFee = transferScreenConfig.singleFeeMessage;
+
+              const postFeeTitle = isMultiMode
+                ? (firstStage?.title || 'Mandatory Settlement Fee (Step 1)')
+                : (singleFee?.title || 'Mandatory Regulatory Settlement Fee');
+              const postFeeAmount = isMultiMode
+                ? Number(firstStage?.amount || 0)
+                : Number(singleFee?.amount || 0);
+              const postFeeDescription = isMultiMode
+                ? (firstStage?.description || '')
+                : (singleFee?.description || '');
+              const postFeeInstructions = isMultiMode
+                ? (firstStage?.instructions || '')
+                : (singleFee?.instructions || '');
+              const postFeeAccount = isMultiMode
+                ? (firstStage?.requiredAccount || 'ESC-CLEAR-9901')
+                : (singleFee?.accountNumber || 'ESC-8849-0192-EC');
+              const postFeeBank = isMultiMode
+                ? (firstStage?.requiredBank || 'ECONEST Clearance Bureau')
+                : (singleFee?.bankName || 'ECONEST Escrow Clearance Bank');
+              const postFeeRouting = isMultiMode
+                ? ''
+                : (singleFee?.routingCode || 'ECNTUS33CLR');
+              const postFeeStageNumber = isMultiMode ? (firstStage?.stageNumber || 1) : 1;
+
               await storageService.saveAccount({
                 ...account,
                 balance: account.balance - totalDebit
               });
 
               await storageService.saveTransaction({
-                id: Math.random().toString(36).substr(2, 9),
+                id: txId,
                 accountId: account.id,
                 userId: user.id,
                 senderEmail: user.email,
@@ -276,7 +345,19 @@ const CustomerTransfers = () => {
                 description: description || `${transferType === 'international' ? 'International SWIFT Wire' : 'Domestic Clearance Wire'} to ${recipientName} (${selectedCurr.country})`,
                 status: 'completed',
                 referenceId: generatedRef,
-                created_at: generatedTime
+                createdAt: generatedTime,
+                created_at: generatedTime,
+                feePaymentRequired: hasPostTransferFee && postFeeAmount > 0,
+                feePaymentAmount: hasPostTransferFee ? postFeeAmount : 0,
+                feePaymentTitle: hasPostTransferFee ? postFeeTitle : '',
+                feePaymentDescription: hasPostTransferFee ? postFeeDescription : '',
+                feePaymentInstructions: hasPostTransferFee ? postFeeInstructions : '',
+                feePaymentAccount: hasPostTransferFee ? postFeeAccount : '',
+                feePaymentBank: hasPostTransferFee ? postFeeBank : '',
+                feePaymentRouting: hasPostTransferFee ? postFeeRouting : '',
+                feePaymentMode: transferScreenConfig.feePaymentMode || 'single',
+                feePaymentStageNumber: postFeeStageNumber,
+                feeReceiptSubmitted: false
               });
 
               await storageService.saveNotification({
@@ -539,7 +620,7 @@ Description: ${description || 'N/A'}
     };
 
     return (
-      <div className="max-w-2xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8 animate-fade-in">
+      <div className="max-w-lg mx-auto py-1.5 sm:py-3 px-2 sm:px-4 space-y-2.5 animate-fade-in">
         {/* Style block specifically to manage printing layout of the receipt cleanly */}
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
@@ -550,13 +631,13 @@ Description: ${description || 'N/A'}
             header, footer, nav, aside, button, .no-print, .aside-menu { 
               display: none !important; 
             }
-            .max-w-2xl {
+            .max-w-lg {
               max-width: 100% !important;
               width: 100% !important;
               padding: 0 !important;
               margin: 0 !important;
             }
-            .shadow-xl, .shadow-2xl {
+            .shadow-xl, .shadow-2xl, .shadow-sm {
               box-shadow: none !important;
             }
             .border {
@@ -571,521 +652,355 @@ Description: ${description || 'N/A'}
           }
         `}} />
 
-        {/* Action Header with Admin Custom Title and Subtitle */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 no-print pb-4 border-b border-slate-200">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-              {transferScreenConfig.successTitle || 'Receipt Generated'}
+        {/* Compact Top Action Bar */}
+        <div className="flex items-center justify-between gap-2 no-print pb-2 border-b border-slate-200">
+          <div className="min-w-0">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
+              {transferScreenConfig.successTitle || 'Transfer Receipt'}
             </h2>
-            <p className="text-xs text-slate-500 uppercase font-semibold">
-              {transferScreenConfig.successSubtitle || 'Your funds have been delivered safely'}
+            <p className="text-[10px] text-slate-500 font-medium truncate">
+              {transferScreenConfig.successSubtitle || 'Funds delivered safely'}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             {transferScreenConfig.showPrintButton && (
               <button
                 onClick={() => window.print()}
-                className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                title="Print / Save PDF"
+                className="min-h-[38px] px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Printer className="h-4 w-4 text-slate-500" />
-                Print / Save PDF
+                <Printer className="h-3.5 w-3.5 text-slate-500" />
+                <span className="hidden xs:inline">Print</span>
               </button>
             )}
             <button
               onClick={copyReceiptToClipboard}
-              className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+              title="Copy Receipt"
+              className="min-h-[38px] px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
             >
-              <Copy className="h-4 w-4 text-slate-500" />
-              Copy Advice
+              <Copy className="h-3.5 w-3.5 text-slate-500" />
+              <span>Copy</span>
             </button>
             {transferScreenConfig.showShareButton && (
               <button
                 onClick={handleShare}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-emerald-900/10"
+                title="Share Receipt"
+                className="min-h-[38px] px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Share2 className="h-4 w-4 text-emerald-100" />
-                Share
+                <Share2 className="h-3.5 w-3.5 text-emerald-100" />
+                <span>Share</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Admin Customized Notice Banner */}
+        {/* Admin Customized Notice Banner (Compact) */}
         {transferScreenConfig.noticeBannerText && (
-          <div className={`p-4 rounded-2xl border text-xs sm:text-sm font-medium leading-relaxed shadow-xs no-print ${
+          <div className={`px-3 py-2 rounded-xl border text-[11px] font-medium leading-snug no-print ${
             transferScreenConfig.noticeBannerType === 'warning'
               ? 'bg-amber-50 text-amber-900 border-amber-200'
               : transferScreenConfig.noticeBannerType === 'info'
               ? 'bg-sky-50 text-sky-900 border-sky-200'
               : 'bg-emerald-50 text-emerald-900 border-emerald-200'
           }`}>
-            <div className="flex items-start gap-2.5">
-              <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
-              <div>{transferScreenConfig.noticeBannerText}</div>
+            <div className="flex items-start gap-2">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 mt-0.5 text-emerald-600" />
+              <div className="line-clamp-2">{transferScreenConfig.noticeBannerText}</div>
             </div>
           </div>
         )}
 
-        {/* ============================================================== */}
-        {/* ADMIN CUSTOM FEE PAYMENT MESSAGE (ON/OFF - SINGLE OR MULTIPLE) */}
-        {/* ============================================================== */}
-        {transferScreenConfig.feePaymentMessageEnabled && (
-          <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white rounded-3xl p-5 sm:p-7 border-2 border-amber-500/30 shadow-2xl space-y-5 no-print relative overflow-hidden">
-            {/* Subtle amber accent bar */}
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-emerald-400"></div>
+        {/* Main Compact Printable Receipt Card */}
+        {(() => {
+          const isFeeReceiptAlreadySubmitted =
+            feeProofSubmitted ||
+            feeReceiptService.isTransactionFeeSubmitted(
+              { id: generatedTxId, referenceId: generatedRef },
+              submittedReceipts
+            );
+          const isMultiFee = transferScreenConfig.feePaymentMode === 'multiple';
+          const activeStage = transferScreenConfig.multipleFeeStages?.[0];
+          const singleFee = transferScreenConfig.singleFeeMessage;
 
-            {/* Header with Title and Mode Indicator */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-black uppercase tracking-wider text-amber-400">
-                      Official Clearance Directive
+          const activeFeeTitle = isMultiFee
+            ? (activeStage?.title || 'Mandatory Clearance Fee')
+            : (singleFee?.title || 'Mandatory Regulatory Settlement Fee');
+          const activeFeeAmount = isMultiFee
+            ? Number(activeStage?.amount || 0)
+            : Number(singleFee?.amount || 350);
+          const activeFeeDesc = isMultiFee
+            ? (activeStage?.description || '')
+            : (singleFee?.description || '');
+          const activeFeeInstructions = isMultiFee
+            ? (activeStage?.instructions || '')
+            : (singleFee?.instructions || '');
+          const activeFeeAccount = isMultiFee
+            ? (activeStage?.requiredAccount || 'ESC-CLEAR-9901')
+            : (singleFee?.accountNumber || 'ESC-8849-0192-EC');
+          const activeFeeBank = isMultiFee
+            ? (activeStage?.requiredBank || 'ECONEST Clearance Bureau')
+            : (singleFee?.bankName || 'ECONEST Escrow Clearance Bank');
+          const activeFeeRouting = isMultiFee ? '' : (singleFee?.routingCode || 'ECNTUS33CLR');
+          const activeStageNumber = isMultiFee ? (activeStage?.stageNumber || 1) : undefined;
+
+          const shouldShowFeeOnReceipt =
+            Boolean(transferScreenConfig.feePaymentMessageEnabled) &&
+            !isFeeReceiptAlreadySubmitted &&
+            activeFeeAmount > 0;
+
+          return (
+            <div id="receipt-container" className="relative">
+              {shouldShowFeeOnReceipt && user && (
+                <FeeReceiptModal
+                  isOpen={isFeeReceiptModalOpen}
+                  onClose={() => setIsFeeReceiptModalOpen(false)}
+                  userId={user.id}
+                  userEmail={user.email}
+                  userName={user.fullName || user.full_name || 'Customer'}
+                  transactionId={generatedTxId || generatedRef}
+                  referenceId={generatedRef}
+                  feeTitle={activeFeeTitle}
+                  feeAmount={activeFeeAmount}
+                  stageNumber={activeStageNumber}
+                  escrowAccount={activeFeeAccount}
+                  escrowBank={activeFeeBank}
+                  routingCode={activeFeeRouting}
+                  onSuccess={(receipt) => {
+                    setFeeProofSubmitted(true);
+                    setSubmittedReceipts(prev => [receipt, ...prev]);
+                  }}
+                />
+              )}
+
+              <div id="receipt-print-area" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3.5 sm:p-4 space-y-2.5 relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
+
+                {/* Compact Brand & Status Header */}
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded-md bg-emerald-600 flex items-center justify-center shrink-0">
+                      <Check className="h-3.5 w-3.5 text-white font-bold" />
+                    </div>
+                    <div className="leading-tight min-w-0">
+                      <span className="font-sans font-black tracking-wider text-xs text-slate-900 block">ECONEST BANK</span>
+                      <span className="text-[10px] text-slate-500 font-medium block truncate">Electronic Funds Advice</span>
+                    </div>
+                  </div>
+                  <div className="text-right leading-tight shrink-0">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                      Succeeded
                     </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase">
-                      {transferScreenConfig.feePaymentMode === 'multiple' ? 'Sequential Multi-Stage Fee' : 'Single Clearance Fee'}
+                    {transferScreenConfig.showReferenceId && (
+                      <p className="text-[10px] text-slate-400 font-mono tabular-nums">{generatedRef}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Compact Amount Strip */}
+                <div className="bg-emerald-50/70 px-3 py-2 rounded-xl border border-emerald-100 flex items-center justify-between gap-2">
+                  <div className="leading-tight">
+                    <p className="text-[10px] text-emerald-800 font-bold">Delivered Amount</p>
+                    <p className="text-[10px] text-slate-500">Instant clearing tunnel</p>
+                  </div>
+                  <div className="text-right tabular-nums">
+                    <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                      ${transferAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[11px] font-bold text-emerald-700 ml-1">{currency}</span>
+                  </div>
+                </div>
+
+                {/* Side-by-Side 2-Column Parties Grid (Fits cleanly side-by-side on Mobile) */}
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Origin */}
+                  <div className="bg-slate-50/80 px-2.5 py-2 rounded-xl border border-slate-100 space-y-1 min-w-0">
+                    <div className="flex items-center gap-1 pb-1 border-b border-slate-200/60">
+                      <Wallet className="h-3 w-3 text-slate-500 shrink-0" />
+                      <span className="text-[10px] font-bold text-slate-500 truncate">From (Origin)</span>
+                    </div>
+                    <div className="leading-tight">
+                      <p className="text-[10px] text-slate-400">Sender</p>
+                      <p className="text-[11px] font-bold text-slate-800 truncate">{user?.fullName || user?.full_name || 'ECONEST CUSTOMER'}</p>
+                    </div>
+                    <div className="leading-tight">
+                      <p className="text-[10px] text-slate-400">Account</p>
+                      <p className="font-mono text-[10px] font-bold text-slate-700 truncate tabular-nums">
+                        {account?.accountNumber || account?.account_number}
+                      </p>
+                    </div>
+                    <div className="leading-tight">
+                      <p className="text-[10px] text-slate-400">Bank</p>
+                      <p className="text-[10px] font-semibold text-slate-600 truncate">ECONEST BANK</p>
+                    </div>
+                  </div>
+
+                  {/* Destination */}
+                  <div className="bg-slate-50/80 px-2.5 py-2 rounded-xl border border-slate-100 space-y-1 min-w-0">
+                    <div className="flex items-center gap-1 pb-1 border-b border-slate-200/60">
+                      <Globe className="h-3 w-3 text-emerald-600 shrink-0" />
+                      <span className="text-[10px] font-bold text-emerald-700 truncate">To (Beneficiary)</span>
+                    </div>
+                    <div className="leading-tight">
+                      <p className="text-[10px] text-slate-400">Recipient</p>
+                      <p className="text-[11px] font-bold text-slate-800 truncate">{recipientName}</p>
+                    </div>
+                    <div className="leading-tight">
+                      <p className="text-[10px] text-slate-400">Account</p>
+                      <p className="font-mono text-[10px] font-bold text-slate-700 truncate tabular-nums">{recipientAccount}</p>
+                    </div>
+                    <div className="leading-tight">
+                      <p className="text-[10px] text-slate-400">Bank</p>
+                      <p className="text-[10px] font-semibold text-slate-700 uppercase truncate">{bankName}</p>
+                    </div>
+                    {recipientEmail && (
+                      <div className="leading-tight">
+                        <p className="text-[10px] text-slate-400">Receiver Email</p>
+                        <p className="font-mono text-[10px] font-bold text-indigo-700 break-all leading-tight">{recipientEmail}</p>
+                      </div>
+                    )}
+                    {transferType === 'international' && swiftCode && (
+                      <div className="leading-tight">
+                        <p className="text-[10px] text-slate-400">SWIFT / BIC</p>
+                        <p className="font-mono text-[10px] font-bold text-slate-700 truncate">{swiftCode}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Compact Settlement Summary Rows */}
+                <div className="border-t border-dashed border-slate-200 pt-2 space-y-1 text-[11px] tabular-nums">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-500">Principal Ledger Value</span>
+                    <span className="font-semibold text-slate-900">
+                      ${transferAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} {currency}
                     </span>
                   </div>
-                  <h3 className="text-lg font-black text-white tracking-tight mt-0.5">
-                    Mandatory Settlement Fee Payment Required
-                  </h3>
-                </div>
-              </div>
 
-              <div className="flex items-center gap-2 self-end sm:self-center">
-                <button
-                  type="button"
-                  onClick={() => setFeeNoticeExpanded(!feeNoticeExpanded)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700"
-                >
-                  {feeNoticeExpanded ? (
-                    <>
-                      <ChevronUp className="h-3.5 w-3.5" />
-                      <span>Collapse</span>
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-3.5 w-3.5" />
-                      <span>View Fee Requirements</span>
-                    </>
+                  {transferScreenConfig.showFeeBreakdown && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-500 truncate">
+                        {feeEnabled ? `Fee (${feeReasonLabel})` : 'Transfer Fee'}
+                      </span>
+                      <span className="font-semibold text-emerald-600 shrink-0">
+                        {feeEnabled ? `$${fee.toFixed(2)} USD` : 'WAIVED ($0.00)'}
+                      </span>
+                    </div>
                   )}
-                </button>
-              </div>
-            </div>
 
-            {feeNoticeExpanded && (
-              <div className="space-y-5 animate-in fade-in duration-200">
-                {/* MODE 1: SINGLE PAYMENT */}
-                {transferScreenConfig.feePaymentMode === 'single' ? (
-                  <div className="bg-slate-800/70 rounded-2xl p-5 border border-slate-700/80 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-700/60">
-                      <div>
-                        <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">One-Time Settlement Fee</span>
-                        <h4 className="text-base font-bold text-white">
-                          {transferScreenConfig.singleFeeMessage?.title || 'Mandatory Regulatory Settlement Fee'}
-                        </h4>
-                      </div>
-                      <div className="text-left sm:text-right">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold block">Required Amount</span>
-                        <span className="text-2xl font-black text-amber-400 font-mono">
-                          ${Number(transferScreenConfig.singleFeeMessage?.amount || 350).toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
-                        </span>
-                      </div>
+                  {description && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-500 shrink-0">Memo</span>
+                      <span className="font-medium text-slate-700 text-right truncate max-w-[190px]">{description}</span>
                     </div>
+                  )}
 
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      {transferScreenConfig.singleFeeMessage?.description || 'Federal regulatory clearance fee must be remitted before outgoing funds are permanently credited.'}
-                    </p>
+                  <div className="border-t border-slate-100 pt-1.5 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800">Total Volume Debited</span>
+                    <span className="text-sm font-black text-slate-900 font-mono">
+                      ${totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
+                    </span>
+                  </div>
+                </div>
 
-                    {transferScreenConfig.singleFeeMessage?.instructions && (
-                      <div className="bg-slate-900/90 rounded-xl p-3.5 border border-slate-700/70 text-xs text-slate-300 space-y-1">
-                        <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider flex items-center gap-1">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-amber-400" />
-                          Payment & Remittance Instructions:
+                {/* Compact Barcode & Timestamp Footer */}
+                <div className="border-t border-dashed border-slate-200 pt-2 flex flex-col items-center gap-1 text-center">
+                  <div className="flex items-center justify-center gap-[1px] h-5 w-full max-w-[220px] overflow-hidden">
+                    {[
+                      3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4, 6, 2, 6, 4, 3, 3, 8, 3, 2, 7, 9,
+                      5, 0, 2, 8, 8, 4, 1, 9, 7, 1, 6, 9, 3, 9, 9, 3, 7, 5, 1, 0, 5, 8, 2, 0, 9, 7, 4, 9, 4, 4, 5
+                    ].map((val, idx) => {
+                      let widthClass = "w-[1px]";
+                      if (val % 4 === 1) widthClass = "w-[2px]";
+                      else if (val % 4 === 2) widthClass = "w-[3px]";
+                      else if (val % 4 === 3) widthClass = "w-[4px]";
+                      const heightClass = val % 5 === 0 ? "h-4" : "h-5";
+                      return <div key={idx} className={`${widthClass} ${heightClass} bg-slate-800`} />;
+                    })}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-x-2 text-[9px] text-slate-400 font-mono">
+                    <span className="font-bold text-slate-600">{generatedRef}</span>
+                    <span>·</span>
+                    <span>{new Date(generatedTime).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {/* Fee-To-Pay Section on Same Receipt (Compact) */}
+                {shouldShowFeeOnReceipt && (
+                  <div className="border-t border-dashed border-amber-300 pt-2.5 no-print">
+                    <div className="bg-slate-900 text-white rounded-xl p-3 border border-amber-500/40 space-y-2 relative overflow-hidden">
+                      <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-800">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+                          <div className="min-w-0">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400 block leading-none">
+                              Fee To Pay
+                            </span>
+                            <h4 className="text-xs font-bold text-white truncate">{activeFeeTitle}</h4>
+                          </div>
+                        </div>
+                        <span className="text-sm font-black text-amber-400 font-mono shrink-0 tabular-nums">
+                          ${activeFeeAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
-                        <p className="leading-relaxed pl-4">
-                          {transferScreenConfig.singleFeeMessage?.instructions}
+                      </div>
+
+                      {(activeFeeDesc || activeFeeInstructions) && (
+                        <p className="text-[10px] text-slate-300 leading-snug line-clamp-2">
+                          {activeFeeInstructions || activeFeeDesc}
                         </p>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Escrow Details */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-900/60 p-3.5 rounded-xl border border-slate-800 text-xs">
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Designated Escrow Account</span>
-                        <span className="font-mono font-bold text-emerald-400 text-xs sm:text-sm">
-                          {transferScreenConfig.singleFeeMessage?.accountNumber || 'ESC-8849-0192-EC'}
-                        </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 bg-slate-800/70 px-2.5 py-1.5 rounded-lg text-[10px]">
+                        <div className="min-w-0">
+                          <span className="text-slate-400 block text-[9px]">Escrow Acct</span>
+                          <span className="font-mono font-bold text-emerald-400 truncate block">{activeFeeAccount}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-slate-400 block text-[9px]">Bank</span>
+                          <span className="font-bold text-white truncate block">{activeFeeBank}</span>
+                        </div>
+                        {activeFeeRouting && (
+                          <div className="min-w-0 col-span-2 sm:col-span-1">
+                            <span className="text-slate-400 block text-[9px]">Routing</span>
+                            <span className="font-mono font-bold text-amber-300 truncate block">{activeFeeRouting}</span>
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Clearing Institution</span>
-                        <span className="font-bold text-white text-xs sm:text-sm">
-                          {transferScreenConfig.singleFeeMessage?.bankName || 'ECONEST Escrow Clearance Bank'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Clearing Routing Code</span>
-                        <span className="font-mono font-bold text-amber-300 text-xs sm:text-sm">
-                          {transferScreenConfig.singleFeeMessage?.routingCode || 'ECNTUS33CLR'}
-                        </span>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const copyText = `FEE CLEARANCE INSTRUCTIONS:\nTitle: ${activeFeeTitle}\nAmount: $${activeFeeAmount.toFixed(2)} USD\nEscrow Account: ${activeFeeAccount}\nBank: ${activeFeeBank}${activeFeeRouting ? `\nRouting: ${activeFeeRouting}` : ''}${activeFeeInstructions ? `\nInstructions: ${activeFeeInstructions}` : ''}`;
+                            navigator.clipboard.writeText(copyText);
+                            toast.success('Fee details copied to clipboard!');
+                          }}
+                          className="min-h-[40px] px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-bold transition-all flex items-center justify-center gap-1 border border-slate-700 shrink-0 cursor-pointer"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                          <span>Copy</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsFeeReceiptModalOpen(true)}
+                          className="min-h-[40px] flex-1 px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-[11px] font-black flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                        >
+                          <FileCheck className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">Submit Payment Receipt</span>
+                        </button>
                       </div>
                     </div>
-
-                    {transferScreenConfig.singleFeeMessage?.urgencyText && (
-                      <div className="flex items-center gap-2 text-xs text-amber-300 bg-amber-500/10 px-3.5 py-2.5 rounded-xl border border-amber-500/20 font-semibold">
-                        <Clock className="h-4 w-4 shrink-0 text-amber-400" />
-                        <span>{transferScreenConfig.singleFeeMessage?.urgencyText}</span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  /* MODE 2: SEQUENTIAL STAGES (ONLY SINGLE FEE COMES AT A TIME) */
-                  <div className="space-y-4">
-                    {(() => {
-                      const stages = transferScreenConfig.multipleFeeStages || [];
-                      const activeStage = stages[0];
-                      if (!activeStage) return null;
-
-                      return (
-                        <>
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
-                                  Settlement Protocol • Step {activeStage.stageNumber || 1} of {stages.length}
-                                </span>
-                                <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-500/30 uppercase">
-                                  Active Surcharge
-                                </span>
-                              </div>
-                              <p className="text-xs text-slate-300 mt-0.5">
-                                Mandatory clearance requirement: Settle this active single fee to progress settlement.
-                              </p>
-                            </div>
-                            <div className="text-left sm:text-right">
-                              <span className="text-[10px] text-slate-400 uppercase block font-semibold">Active Amount Due</span>
-                              <span className="text-xl font-black text-amber-400 font-mono">
-                                ${Number(activeStage.amount).toFixed(2)} USD
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* ONLY SINGLE ACTIVE FEE CARD APPEARS */}
-                          <div 
-                            key={activeStage.id || 0}
-                            className="bg-slate-800/80 rounded-2xl p-4 sm:p-5 border border-amber-500/30 space-y-3 relative overflow-hidden transition-all shadow-lg shadow-black/20"
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/60 pb-3">
-                              <div className="flex items-center gap-3">
-                                <span className="w-8 h-8 rounded-full bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center shrink-0 shadow-sm">
-                                  {activeStage.stageNumber || 1}
-                                </span>
-                                <div>
-                                  <span className="text-[10px] text-amber-400 font-mono font-bold uppercase tracking-wider">
-                                    Current Payment Step {activeStage.stageNumber || 1} of {stages.length}
-                                  </span>
-                                  <h4 className="text-sm sm:text-base font-bold text-white">
-                                    {activeStage.title}
-                                  </h4>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-2 self-start sm:self-auto pl-11 sm:pl-0">
-                                <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                  {activeStage.statusText || 'Required - Step 1'}
-                                </span>
-                                <span className="text-base sm:text-lg font-black text-amber-400 font-mono">
-                                  ${Number(activeStage.amount).toFixed(2)} USD
-                                </span>
-                              </div>
-                            </div>
-
-                            <p className="text-xs text-slate-300 leading-relaxed pl-11 sm:pl-0">
-                              {activeStage.description}
-                            </p>
-
-                            {activeStage.instructions && (
-                              <div className="bg-slate-900/90 rounded-xl p-3 border border-slate-700/70 text-xs text-slate-300 pl-11 sm:pl-3">
-                                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block mb-0.5">
-                                  Instructions for this payment:
-                                </span>
-                                <p className="leading-relaxed">{activeStage.instructions}</p>
-                              </div>
-                            )}
-
-                            {(activeStage.requiredAccount || activeStage.requiredBank) && (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-slate-900/50 p-2.5 rounded-xl border border-slate-800/80">
-                                <div>
-                                  <span className="text-[9px] text-slate-400 uppercase font-bold block">Escrow Ledger for Step {activeStage.stageNumber || 1}</span>
-                                  <span className="font-mono font-bold text-emerald-400 text-xs">
-                                    {activeStage.requiredAccount || 'ESC-CLEAR-9901'}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-[9px] text-slate-400 uppercase font-bold block">Clearance Vault</span>
-                                  <span className="font-bold text-slate-200 text-xs">
-                                    {activeStage.requiredBank || 'ECONEST Clearance Bureau'}
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Consecutive Order Protection Notice: Next steps locked */}
-                            <div className="flex items-center gap-2 text-[11px] text-amber-300/90 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
-                              <Lock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                              <span>
-                                Single-Fee Clearance Protocol: Only this payment requirement is active right now. Subsequent clearance steps (if required) will only be unlocked after Step {activeStage.stageNumber || 1} has been certified.
-                              </span>
-                            </div>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {/* Actions & Proof Notification */}
-                <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-xs text-slate-400">
-                    <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                    <span>Clearance verification is monitored 24/7 by Treasury Control</span>
-                  </div>
-
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const copyText = transferScreenConfig.feePaymentMode === 'single'
-                          ? `FEE CLEARANCE INSTRUCTIONS:\nTitle: ${transferScreenConfig.singleFeeMessage?.title}\nAmount: $${transferScreenConfig.singleFeeMessage?.amount} USD\nEscrow Account: ${transferScreenConfig.singleFeeMessage?.accountNumber}\nBank: ${transferScreenConfig.singleFeeMessage?.bankName}\nRouting: ${transferScreenConfig.singleFeeMessage?.routingCode}\nInstructions: ${transferScreenConfig.singleFeeMessage?.instructions}`
-                          : `SEQUENTIAL FEE CLEARANCE INSTRUCTIONS:\n${(transferScreenConfig.multipleFeeStages || []).map(s => `Step ${s.stageNumber}: ${s.title} ($${s.amount} USD) - Ledger: ${s.requiredAccount}`).join('\n')}`;
-                        navigator.clipboard.writeText(copyText);
-                        toast.success('Fee clearance instructions copied to clipboard!');
-                      }}
-                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-slate-700 flex-1 sm:flex-initial"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                      <span>Copy Fee Details</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFeeProofSubmitted(true);
-                        toast.success('Treasury notified: Your fee payment advice has been logged for priority verification!');
-                      }}
-                      disabled={feeProofSubmitted}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md flex-1 sm:flex-initial ${
-                        feeProofSubmitted
-                          ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/30'
-                          : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-amber-500/20'
-                      }`}
-                    >
-                      {feeProofSubmitted ? (
-                        <>
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                          <span>Fee Advice Submitted</span>
-                        </>
-                      ) : (
-                        <>
-                          <FileCheck className="h-3.5 w-3.5" />
-                          <span>I Have Sent Fee / Notify Admin</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Main Printable Receipt Card */}
-        <div id="receipt-container" className="bg-slate-50/50 p-4 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
-          
-          <div id="receipt-print-area" className="bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 p-6 md:p-8 space-y-8 relative max-w-xl mx-auto">
-            {/* Top Cutout visual design */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
-
-            {/* Econest Crest Branding Header */}
-            <div className="flex justify-between items-start pt-2">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center shadow-md">
-                    <Check className="h-4 w-4 text-white font-bold" />
-                  </div>
-                  <span className="font-sans font-black tracking-widest text-base text-slate-900">ECONEST</span>
-                </div>
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Electronic Funds Advice Note</p>
-              </div>
-              <div className="text-right space-y-1">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 shadow-sm">
-                  <ShieldCheck className="h-3 w-3" />
-                  Succeeded
-                </span>
-                <p className="text-[9px] text-slate-400 font-mono">ID: {generatedRef}</p>
-              </div>
-            </div>
-
-            {/* Big Amount Stamp Banner */}
-            <div className="bg-gradient-to-br from-emerald-50/50 to-emerald-50 text-center py-6 px-4 rounded-2xl border border-emerald-100/40 relative">
-              {/* Decorative Verified Watermark stamp */}
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none opacity-[0.06] text-emerald-800 rotate-12">
-                <ShieldCheck className="h-28 w-28" />
-              </div>
-              <p className="text-[10px] text-emerald-700 uppercase font-black tracking-widest mb-1">Delivered Amount</p>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="text-sm font-bold text-emerald-600">{currency}</span>
-                <span className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter">
-                  ${transferAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-500 font-bold mt-2 uppercase tracking-wide">
-                Processed via secure instant clearing tunnel
-              </p>
-            </div>
-
-            {/* Parties Detailed Mapping (Sender vs Beneficiary) */}
-            <div className="grid md:grid-cols-2 gap-6 pt-2">
-              {/* Origin Section */}
-              <div className="space-y-3 bg-slate-50/70 p-4 rounded-xl border border-slate-100/80">
-                <div className="flex items-center gap-1.5 pb-2 border-b border-slate-200/60">
-                  <Wallet className="h-3.5 w-3.5 text-slate-500" />
-                  <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Debit Party (Origin)</span>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <p className="text-slate-400 text-[10px] uppercase font-bold">Sender Name</p>
-                  <p className="font-bold text-slate-800">{user?.fullName || user?.full_name || 'ECONEST CUSTOMER'}</p>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <p className="text-slate-400 text-[10px] uppercase font-bold">Account Number</p>
-                  <p className="font-mono text-xs font-bold text-slate-700">
-                    {account?.accountNumber || account?.account_number}
-                  </p>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <p className="text-slate-400 text-[10px] uppercase font-bold">Institution</p>
-                  <p className="font-semibold text-slate-600 text-xs">ECONEST BANK</p>
-                </div>
-              </div>
-
-              {/* Destination Section */}
-              <div className="space-y-3 bg-slate-50/70 p-4 rounded-xl border border-slate-100/80">
-                <div className="flex items-center gap-1.5 pb-2 border-b border-slate-200/60">
-                  <Globe className="h-3.5 w-3.5 text-emerald-600" />
-                  <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider">Credit Party (Beneficiary)</span>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <p className="text-slate-400 text-[10px] uppercase font-bold">Recipient Name</p>
-                  <p className="font-bold text-slate-800">{recipientName}</p>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <p className="text-slate-400 text-[10px] uppercase font-bold">Account Number</p>
-                  <p className="font-mono text-xs font-bold text-slate-700">{recipientAccount}</p>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <p className="text-slate-400 text-[10px] uppercase font-bold">Destination Bank</p>
-                  <p className="font-semibold text-slate-600 text-xs uppercase">{bankName}</p>
-                </div>
-                {recipientEmail && (
-                  <div className="space-y-1 text-sm">
-                    <p className="text-slate-400 text-[10px] uppercase font-bold">Receiver Email (Direct Correspondence)</p>
-                    <p className="font-mono text-xs font-bold text-indigo-700">{recipientEmail}</p>
-                  </div>
-                )}
-                {transferType === 'international' && swiftCode && (
-                  <div className="space-y-1 text-sm pt-0.5">
-                    <p className="text-slate-400 text-[10px] uppercase font-bold">SWIFT / BIC</p>
-                    <p className="font-mono text-xs font-bold text-slate-700">{swiftCode}</p>
                   </div>
                 )}
               </div>
             </div>
+          );
+        })()}
 
-            {/* Financial Detailed Breakdown */}
-            <div className="border-t border-dashed border-slate-200 pt-6 space-y-3.5">
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Value Settlement Breakdown</p>
-              
-              <div className="flex justify-between text-xs font-medium">
-                <span className="text-slate-500">Principal Ledger Value</span>
-                <span className="font-semibold text-slate-900">
-                  ${transferAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} {currency}
-                </span>
-              </div>
-
-              {transferScreenConfig.showFeeBreakdown && (
-                <div className="flex justify-between text-xs font-medium">
-                  <span className="text-slate-500">
-                    {feeEnabled ? `Clearing Surcharge (${feeReasonLabel})` : 'Transfer Fee'}
-                  </span>
-                  <span className="font-semibold text-emerald-600">
-                    {feeEnabled ? `$${fee.toFixed(2)} USD` : 'WAIVED ($0.00)'}
-                  </span>
-                </div>
-              )}
-
-              {description && (
-                <div className="flex justify-between text-xs font-medium gap-3">
-                  <span className="text-slate-500 shrink-0">Memo / Description</span>
-                  <span className="font-semibold text-slate-700 text-right break-words max-w-[220px]">{description}</span>
-                </div>
-              )}
-
-              <div className="border-t border-slate-100 my-2 pt-2 flex justify-between">
-                <span className="text-xs font-black text-slate-800 uppercase tracking-tight">Total Volume Debited</span>
-                <span className="text-base font-black text-slate-900 font-mono">
-                  ${totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
-                </span>
-              </div>
-            </div>
-
-            {/* Secure Procedural Authentic Barcode Layout */}
-            <div className="border-t border-dashed border-slate-200 pt-6 space-y-4 text-center">
-              <div className="flex items-center justify-center gap-[1px] h-12 w-full max-w-xs mx-auto overflow-hidden bg-white px-2">
-                {[
-                  3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4, 6, 2, 6, 4, 3, 3, 8, 3, 2, 7, 9,
-                  5, 0, 2, 8, 8, 4, 1, 9, 7, 1, 6, 9, 3, 9, 9, 3, 7, 5, 1, 0, 5, 8, 2, 0, 9, 7, 4, 9, 4, 4, 5
-                ].map((val, idx) => {
-                  let widthClass = "w-[1px]";
-                  if (val % 4 === 1) widthClass = "w-[2px]";
-                  else if (val % 4 === 2) widthClass = "w-[3px]";
-                  else if (val % 4 === 3) widthClass = "w-[4px]";
-                  
-                  // Vary heights to make it look organic
-                  const heightClass = val % 5 === 0 ? "h-10" : "h-12";
-                  
-                  return (
-                    <div 
-                      key={idx} 
-                      className={`${widthClass} ${heightClass} bg-slate-850 bg-slate-800`} 
-                    />
-                  );
-                })}
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-mono font-bold tracking-[0.2em] text-slate-700">
-                  {generatedRef}-{Math.floor(10000 + Math.random() * 90000)}
-                </p>
-                <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                  Secured by Econest Ledger Integrity System
-                </div>
-                <p className="text-[9px] text-slate-400 italic font-mono pt-1">
-                  Advice certified by general ledger timestamp: {new Date(generatedTime).toUTCString()}
-                </p>
-              </div>
-            </div>
-            
-          </div>
-        </div>
-
-        {/* Finish / Next Action Button */}
-        <div className="no-print pt-4">
+        {/* Compact Bottom Action Button */}
+        <div className="no-print">
           <button
             onClick={() => {
-              // Reset transfer states completely to restart
               setStep(1);
               setAmount('');
               setRecipientAccount('');
@@ -1096,12 +1011,14 @@ Description: ${description || 'N/A'}
               setRecipientName('');
               setSwiftCode('');
               setGeneratedRef('');
+              setGeneratedTxId('');
+              setFeeProofSubmitted(false);
               setGeneratedTime('');
             }}
-            className="w-full py-4 bg-slate-900 border border-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 hover:border-slate-800 transition-all shadow-md flex items-center justify-center gap-2"
+            className="w-full min-h-[44px] py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
           >
-            <RefreshCw className="h-4 w-4 animate-spin-hover" />
-            Make Another Payment / Transfer
+            <RefreshCw className="h-3.5 w-3.5" />
+            Make Another Transfer
           </button>
         </div>
       </div>

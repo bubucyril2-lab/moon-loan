@@ -35,12 +35,16 @@ import {
   Search,
   Filter,
   ChevronRight,
-  MessageSquare
+  MessageSquare,
+  AlertTriangle,
+  FileCheck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Account, Transaction } from '../../types';
 import { safeFormat } from '../../utils/date';
 import { storageService } from '../../services/storage';
+import { feeReceiptService, FeeReceiptItem } from '../../services/feeReceiptService';
+import { FeeReceiptModal } from '../../components/common/FeeReceiptModal';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import { 
@@ -188,9 +192,11 @@ const CustomerDashboard = () => {
   const [fxAmount, setFxAmount] = useState('');
   const [isFxSwapping, setIsFxSwapping] = useState(false);
 
-  // Modal State for Wire Instructions
+  // Modal State for Wire Instructions & Fee Receipt Submission
   const [showWireModal, setShowWireModal] = useState(false);
   const [selectedReceiptTx, setSelectedReceiptTx] = useState<Transaction | null>(null);
+  const [feeReceipts, setFeeReceipts] = useState<FeeReceiptItem[]>([]);
+  const [feeModalTx, setFeeModalTx] = useState<Transaction | null>(null);
 
   // Load balances and vaults from DB & Storage
   useEffect(() => {
@@ -208,6 +214,13 @@ const CustomerDashboard = () => {
 
           const txs = await storageService.getTransactionsByAccountId(acc.id, user.id);
           setTransactions(txs.sort((a, b) => new Date(b.createdAt || b.created_at || '').getTime() - new Date(a.createdAt || a.created_at || '').getTime()));
+        }
+
+        try {
+          const receipts = await feeReceiptService.getReceiptsForUser(user.id);
+          setFeeReceipts(receipts);
+        } catch {
+          // ignore
         }
 
         // Load card frozen state
@@ -548,6 +561,14 @@ const CustomerDashboard = () => {
     return matchesSearch && matchesType;
   });
 
+  const pendingFeeTxs = transactions.filter(
+    (tx) =>
+      tx.type === 'debit' &&
+      Boolean(tx.feePaymentRequired) &&
+      Number(tx.feePaymentAmount || 0) > 0 &&
+      !feeReceiptService.isTransactionFeeSubmitted(tx, feeReceipts)
+  );
+
   return (
     <div className="space-y-8 pb-16">
       
@@ -680,32 +701,73 @@ const CustomerDashboard = () => {
           </div>
         </div>
 
-        {/* Relevant Transfer Actions - Clean & Focused */}
+        {/* Relevant Transfer Actions & Customer Identity - Clean & Focused */}
         <div className="lg:col-span-7 flex flex-col justify-between bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-sm space-y-4">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                Capital Transfer
-              </span>
+            {/* Customer Profile Identity Header */}
+            <div className="flex items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-50 border-2 border-emerald-200 overflow-hidden flex items-center justify-center shrink-0 shadow-xs">
+                  {user?.profilePicture ? (
+                    <img
+                      src={user.profilePicture}
+                      alt={user.fullName || 'Customer Profile'}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <UserIcon className="h-6 w-6 text-emerald-600" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <h2 className="text-sm sm:text-base font-black text-slate-900 truncate">
+                      {user?.fullName || user?.full_name || 'Customer'}
+                    </h2>
+                    <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                  </div>
+                  <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                  <div className="flex items-center gap-2 text-[11px] text-slate-400 font-medium mt-0.5">
+                    {account?.accountNumber && (
+                      <span className="font-mono font-semibold text-slate-600">Acct {account.accountNumber}</span>
+                    )}
+                    {(user?.city || user?.country) && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span className="truncate">{[user?.city, user?.country].filter(Boolean).join(', ')}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <button
                 onClick={toggleHideAmount}
-                className="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 cursor-pointer transition-colors shrink-0"
                 title={isAmountHidden ? "Show Balance" : "Hide Balance"}
               >
                 {isAmountHidden ? <Eye className="h-3.5 w-3.5 text-emerald-600" /> : <EyeOff className="h-3.5 w-3.5" />}
-                <span>{isAmountHidden ? 'Show Amount' : 'Hide Amount'}</span>
+                <span className="hidden sm:inline">{isAmountHidden ? 'Show Amount' : 'Hide Amount'}</span>
               </button>
             </div>
 
-            <div className="mt-4">
-              <p className="text-xs font-medium text-slate-500">Available Liquid Balance</p>
-              <p className="text-2xl sm:text-3xl font-black font-mono text-slate-900 tracking-tight mt-0.5">
-                {isAmountHidden ? (
-                  <span className="text-slate-400 select-none">••••••••</span>
-                ) : (
-                  <span>${account?.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-sm font-sans font-bold text-slate-400">USD</span></span>
-                )}
-              </p>
+            <div className="mt-3.5 flex items-end justify-between gap-2">
+              <div>
+                <p className="text-xs font-medium text-slate-500">Available Liquid Balance</p>
+                <p className="text-2xl sm:text-3xl font-black font-mono text-slate-900 tracking-tight mt-0.5 tabular-nums">
+                  {isAmountHidden ? (
+                    <span className="text-slate-400 select-none">••••••••</span>
+                  ) : (
+                    <span>${account?.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-sm font-sans font-bold text-slate-400">USD</span></span>
+                  )}
+                </p>
+              </div>
+              <Link
+                to="/dashboard/settings?tab=Profile"
+                className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 whitespace-nowrap shrink-0"
+              >
+                Edit Profile
+              </Link>
             </div>
           </div>
 
@@ -746,6 +808,99 @@ const CustomerDashboard = () => {
         </div>
 
       </div>
+
+      {/* 2a. Pending Fee Payment Required (Disappears permanently once payment receipt is submitted) */}
+      {pendingFeeTxs.length > 0 && (
+        <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border-2 border-amber-500/40 shadow-xl space-y-4 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-amber-500 to-emerald-400"></div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 block">
+                  Fee Payment Pending Receipt Submission
+                </span>
+                <h3 className="text-base sm:text-lg font-black text-white">
+                  Submit Fee Payment Receipt ({pendingFeeTxs.length})
+                </h3>
+              </div>
+            </div>
+            <span className="text-[11px] text-slate-300">
+              Clear your pending transfer fee by uploading your payment receipt
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {pendingFeeTxs.map((tx) => {
+              const refCode = tx.referenceId || tx.reference_id || tx.id;
+              return (
+                <div
+                  key={tx.id}
+                  className="bg-slate-800/75 rounded-2xl p-4 border border-slate-700/80 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-amber-300 font-mono text-[10px] font-bold">
+                        Ref #{refCode}
+                      </span>
+                      {tx.recipientName && (
+                        <span className="text-xs text-slate-300 font-semibold">
+                          Transfer to {tx.recipientName} (${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-sm font-black text-white">
+                      {tx.feePaymentTitle || 'Mandatory Settlement Fee'}
+                    </h4>
+                    {tx.feePaymentInstructions && (
+                      <p className="text-xs text-slate-300 leading-relaxed">{tx.feePaymentInstructions}</p>
+                    )}
+                    {(tx.feePaymentAccount || tx.feePaymentBank) && (
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-300 pt-1">
+                        {tx.feePaymentBank && (
+                          <span>
+                            Bank: <strong className="text-white">{tx.feePaymentBank}</strong>
+                          </span>
+                        )}
+                        {tx.feePaymentAccount && (
+                          <span>
+                            Escrow Account: <strong className="font-mono text-emerald-400">{tx.feePaymentAccount}</strong>
+                          </span>
+                        )}
+                        {tx.feePaymentRouting && (
+                          <span>
+                            Routing: <strong className="font-mono text-amber-300">{tx.feePaymentRouting}</strong>
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end justify-between gap-3 shrink-0">
+                    <div className="text-left lg:text-right">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold block">Fee Due</span>
+                      <span className="text-xl font-black text-amber-400 font-mono">
+                        ${Number(tx.feePaymentAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFeeModalTx(tx)}
+                      className="w-full sm:w-auto px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <FileCheck className="h-4 w-4" />
+                      <span>Submit Payment Receipt</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 2b. Immediate Transaction History Ledger (Placed directly below ATM Card as requested) */}
       <div id="transactions-ledger-section" className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 border border-slate-200 shadow-sm space-y-5 sm:space-y-6">
@@ -1450,94 +1605,142 @@ const CustomerDashboard = () => {
 
       {/* Official Transaction Settlement Receipt Modal */}
       {selectedReceiptTx && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border border-slate-200 shadow-2xl relative space-y-5 animate-in fade-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="flex items-start justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3">
+          <div className="bg-white rounded-2xl max-w-md w-full p-4 border border-slate-200 shadow-2xl relative space-y-3 animate-in fade-in zoom-in-95 duration-200">
+            {/* Compact Header */}
+            <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                   selectedReceiptTx.type === 'credit' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
                 }`}>
-                  {selectedReceiptTx.type === 'credit' ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
+                  {selectedReceiptTx.type === 'credit' ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
                 </div>
-                <div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-50 text-emerald-700 uppercase tracking-widest border border-emerald-200">
-                    SETTLED AUDIT RECEIPT
-                  </span>
-                  <h3 className="text-base font-black text-slate-900 mt-0.5">
+                <div className="min-w-0 leading-tight">
+                  <span className="text-[10px] font-bold text-emerald-700 block">Settled Receipt</span>
+                  <h3 className="text-sm font-black text-slate-900 truncate">
                     {selectedReceiptTx.type === 'credit' ? 'Inward Wire Receipt' : 'Outward Transfer Receipt'}
                   </h3>
                 </div>
               </div>
-              <button 
+              <button
+                type="button"
                 onClick={() => setSelectedReceiptTx(null)}
-                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+                className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 shrink-0 cursor-pointer"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Amount Banner */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-1">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Settled Amount</p>
-              <p className={`text-2xl font-black font-mono ${
+            {/* Compact Amount Strip */}
+            <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+              <div className="leading-tight">
+                <p className="text-[10px] font-bold text-slate-400">Settled Amount</p>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                  <Check className="h-3 w-3" />
+                  <span>Completed</span>
+                </span>
+              </div>
+              <p className={`text-lg font-black font-mono tabular-nums ${
                 selectedReceiptTx.type === 'credit' ? 'text-emerald-600' : 'text-slate-900'
               }`}>
                 {selectedReceiptTx.type === 'credit' ? '+' : '-'}${selectedReceiptTx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
               </p>
-              <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                <Check className="h-3 w-3" />
-                <span>Interbank Clearance Completed</span>
-              </div>
             </div>
 
-            {/* Details Table */}
-            <div className="space-y-2.5 text-xs">
-              <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-400 font-medium">Reference Code:</span>
-                <span className="font-mono font-bold text-slate-800">
+            {/* Compact 2-Column Grid for Metadata */}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] bg-slate-50/70 px-3 py-2.5 rounded-xl border border-slate-100">
+              <div className="min-w-0">
+                <span className="text-slate-400 text-[10px] block">Reference</span>
+                <span className="font-mono font-bold text-slate-800 truncate block tabular-nums">
                   {selectedReceiptTx.referenceId || selectedReceiptTx.reference_id || `TX-${selectedReceiptTx.id.slice(0, 10).toUpperCase()}`}
                 </span>
               </div>
 
+              <div className="min-w-0 text-right">
+                <span className="text-slate-400 text-[10px] block">Transfer Rail</span>
+                <span className="font-bold text-slate-800 uppercase truncate block">
+                  {selectedReceiptTx.transferType ? `${selectedReceiptTx.transferType} Wire` : 'Federal Wire'}
+                </span>
+              </div>
+
               {selectedReceiptTx.recipientName && (
-                <div className="flex justify-between py-1.5 border-b border-slate-100">
-                  <span className="text-slate-400 font-medium">Beneficiary / Recipient:</span>
-                  <span className="font-bold text-slate-800">{selectedReceiptTx.recipientName}</span>
+                <div className="min-w-0">
+                  <span className="text-slate-400 text-[10px] block">Recipient</span>
+                  <span className="font-bold text-slate-800 truncate block">{selectedReceiptTx.recipientName}</span>
                 </div>
               )}
+
+              <div className={`min-w-0 ${selectedReceiptTx.recipientName ? 'text-right' : 'col-span-2'}`}>
+                <span className="text-slate-400 text-[10px] block">Date</span>
+                <span className="font-medium text-slate-700 truncate block">
+                  {safeFormat(selectedReceiptTx.createdAt || selectedReceiptTx.created_at, 'MMM dd, yyyy • HH:mm')}
+                </span>
+              </div>
 
               {(selectedReceiptTx.recipientEmail || selectedReceiptTx.recipient_email) && (
-                <div className="flex justify-between py-1.5 border-b border-slate-100 gap-3">
-                  <span className="text-slate-400 font-medium shrink-0">Receiver Email:</span>
-                  <span className="font-medium text-blue-600 break-all text-right">{selectedReceiptTx.recipientEmail || selectedReceiptTx.recipient_email}</span>
+                <div className="col-span-2 min-w-0 pt-0.5 border-t border-slate-200/60 flex items-center justify-between gap-2">
+                  <span className="text-slate-400 text-[10px] shrink-0">Receiver Email</span>
+                  <span className="font-mono font-semibold text-blue-600 truncate text-right">
+                    {selectedReceiptTx.recipientEmail || selectedReceiptTx.recipient_email}
+                  </span>
                 </div>
               )}
 
-              <div className="flex justify-between py-1.5 border-b border-slate-100 gap-3">
-                <span className="text-slate-400 font-medium shrink-0">Description:</span>
-                <span className="font-bold text-slate-800 text-right break-words max-w-[220px]" title={selectedReceiptTx.description}>
-                  {selectedReceiptTx.description}
-                </span>
-              </div>
-
-              <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-400 font-medium">Transfer Rail:</span>
-                <span className="font-bold text-slate-800 uppercase">
-                  {selectedReceiptTx.transferType ? `${selectedReceiptTx.transferType} Wire` : 'Federal Reserve Wire'}
-                </span>
-              </div>
-
-              <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-400 font-medium">Settlement Date:</span>
-                <span className="font-medium text-slate-800">
-                  {safeFormat(selectedReceiptTx.createdAt || selectedReceiptTx.created_at, 'MMMM dd, yyyy • HH:mm:ss')}
-                </span>
-              </div>
+              {selectedReceiptTx.description && (
+                <div className="col-span-2 min-w-0 pt-0.5 border-t border-slate-200/60 flex items-center justify-between gap-2">
+                  <span className="text-slate-400 text-[10px] shrink-0">Description</span>
+                  <span className="font-semibold text-slate-800 truncate text-right" title={selectedReceiptTx.description}>
+                    {selectedReceiptTx.description}
+                  </span>
+                </div>
+              )}
             </div>
 
+            {/* Fee to Pay Section inside Receipt Modal */}
+            {Boolean(selectedReceiptTx.feePaymentRequired) &&
+              Number(selectedReceiptTx.feePaymentAmount || 0) > 0 &&
+              !feeReceiptService.isTransactionFeeSubmitted(selectedReceiptTx, feeReceipts) && (
+                <div className="p-3 rounded-xl bg-slate-900 text-white border border-amber-500/40 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400 block">
+                        Fee To Pay
+                      </span>
+                      <p className="text-xs font-bold text-white truncate">
+                        {selectedReceiptTx.feePaymentTitle || 'Mandatory Settlement Fee'}
+                      </p>
+                    </div>
+                    <span className="text-sm font-black font-mono text-amber-400 shrink-0 tabular-nums">
+                      ${Number(selectedReceiptTx.feePaymentAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
+                    </span>
+                  </div>
+                  {(selectedReceiptTx.feePaymentAccount || selectedReceiptTx.feePaymentBank) && (
+                    <div className="text-[10px] text-slate-300 bg-slate-800/70 px-2.5 py-1.5 rounded-lg border border-slate-700 flex flex-wrap justify-between gap-x-3">
+                      {selectedReceiptTx.feePaymentBank && (
+                        <span>Bank: <strong className="text-white">{selectedReceiptTx.feePaymentBank}</strong></span>
+                      )}
+                      {selectedReceiptTx.feePaymentAccount && (
+                        <span>Escrow: <strong className="font-mono text-emerald-400">{selectedReceiptTx.feePaymentAccount}</strong></span>
+                      )}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = selectedReceiptTx;
+                      setSelectedReceiptTx(null);
+                      setFeeModalTx(target);
+                    }}
+                    className="w-full min-h-[40px] py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <FileCheck className="h-3.5 w-3.5" />
+                    <span>Submit Payment Receipt</span>
+                  </button>
+                </div>
+              )}
+
             {/* Actions */}
-            <div className="grid grid-cols-2 gap-2 pt-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => {
                   copyToClipboard(
@@ -1545,20 +1748,43 @@ const CustomerDashboard = () => {
                     'Reference ID'
                   );
                 }}
-                className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"
+                className="min-h-[40px] py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Copy className="h-3.5 w-3.5" />
                 <span>Copy Ref</span>
               </button>
               <button
                 onClick={() => setSelectedReceiptTx(null)}
-                className="py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-colors"
+                className="min-h-[40px] py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
               >
                 Done
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Fee Payment Receipt Submission Modal */}
+      {feeModalTx && user && (
+        <FeeReceiptModal
+          isOpen={Boolean(feeModalTx)}
+          onClose={() => setFeeModalTx(null)}
+          userId={user.id}
+          userEmail={user.email}
+          userName={user.fullName || user.full_name || 'Customer'}
+          transactionId={feeModalTx.id}
+          referenceId={feeModalTx.referenceId || feeModalTx.reference_id || feeModalTx.id}
+          feeTitle={feeModalTx.feePaymentTitle || 'Mandatory Settlement Fee'}
+          feeAmount={Number(feeModalTx.feePaymentAmount || 0)}
+          stageNumber={feeModalTx.feePaymentStageNumber}
+          escrowAccount={feeModalTx.feePaymentAccount}
+          escrowBank={feeModalTx.feePaymentBank}
+          routingCode={feeModalTx.feePaymentRouting}
+          onSuccess={(receipt) => {
+            setFeeReceipts(prev => [receipt, ...prev]);
+            setFeeModalTx(null);
+          }}
+        />
       )}
 
     </div>

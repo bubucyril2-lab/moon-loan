@@ -21,6 +21,9 @@ import { twMerge } from 'tailwind-merge';
 import NotificationCenter from '../NotificationCenter';
 import { MobileBottomNav } from './MobileBottomNav';
 
+import { Wrench } from 'lucide-react';
+import { storageService } from '../../services/storage';
+
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -30,6 +33,7 @@ const CustomerLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const [maintenanceMode, setMaintenanceMode] = React.useState(false);
 
   React.useEffect(() => {
     if (!isLoading && user && user.role !== 'customer') {
@@ -37,8 +41,46 @@ const CustomerLayout = () => {
     }
   }, [user, isLoading, navigate]);
 
+  React.useEffect(() => {
+    let active = true;
+    storageService.getSettings().then((s) => {
+      if (!active || !s) return;
+      const val = s.maintenance_mode;
+      const isOn = val === true || String(val).trim().toLowerCase() === 'true';
+      setMaintenanceMode(isOn);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [location.pathname]);
+
   if (isLoading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
   if (!user || user.role !== 'customer') return null;
+
+  if (maintenanceMode) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center space-y-5 shadow-2xl">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+            <Wrench className="h-8 w-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black tracking-tight">Scheduled Maintenance</h2>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              The customer banking portal is temporarily paused for system maintenance by administration. Please check back shortly.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              logout();
+              navigate('/login');
+            }}
+            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-bold transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Overview', path: '/dashboard' },

@@ -133,9 +133,18 @@ const AdminDashboard = () => {
           totalTransferVolume: totalVolume
         });
 
+        const parseBool = (val: any, fallback: boolean): boolean => {
+          if (val === undefined || val === null) return fallback;
+          if (typeof val === 'boolean') return val;
+          const s = String(val).trim().toLowerCase();
+          if (s === 'false' || s === '0' || s === 'off') return false;
+          if (s === 'true' || s === '1' || s === 'on') return true;
+          return fallback;
+        };
+
         // Parse Settings
         if (settings) {
-          if (settings.fee_enabled !== undefined) setFeeEnabled(Boolean(settings.fee_enabled));
+          if (settings.fee_enabled !== undefined) setFeeEnabled(parseBool(settings.fee_enabled, true));
           if (settings.fee_reasons) {
             try {
               const parsed = typeof settings.fee_reasons === 'string' ? JSON.parse(settings.fee_reasons) : settings.fee_reasons;
@@ -144,7 +153,14 @@ const AdminDashboard = () => {
           }
         }
 
-        if (smtp) setSmtpConfig(smtp);
+        if (smtp || settings) {
+          setSmtpConfig({
+            ...(smtp || {}),
+            enabled: settings?.email_notifications_enabled !== undefined
+              ? parseBool(settings.email_notifications_enabled, smtp?.enabled ?? true)
+              : (smtp?.enabled ?? true)
+          } as SmtpConfig);
+        }
         setRecentEmails(emails || []);
 
         // Financial 7 days growth curve
@@ -253,7 +269,7 @@ const AdminDashboard = () => {
       value: smtpConfig?.enabled ? 'CONNECTED' : 'STANDBY', 
       icon: Mail, 
       color: smtpConfig?.enabled ? 'from-emerald-700 to-emerald-900' : 'from-slate-700 to-slate-900',
-      badge: smtpConfig?.adminAlertEmail ? `${smtpConfig.adminAlertEmail.split('@')[0]}@` : 'Not Set',
+      badge: smtpConfig?.enabled ? 'SendGrid v3 Active' : 'Paused',
       badgeColor: 'bg-white/20 text-white'
     },
   ];

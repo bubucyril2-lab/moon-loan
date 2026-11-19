@@ -113,7 +113,7 @@ const AdminSettings = () => {
     pass: '',
     fromName: 'ECONEST BANK Alert',
     fromEmail: 'notifications@econestbank.com',
-    adminAlertEmail: 'bubucyril2@gmail.com',
+    adminAlertEmail: 'alerts@econestbank.com',
     enabled: true,
     autoDispatchEnabled: true,
     autoSendTransferReceipt: true,
@@ -142,24 +142,55 @@ const AdminSettings = () => {
   const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
 
+  // Password Gate for Email Gateway Section (Required: da12345)
+  const [isEmailGatewayUnlocked, setIsEmailGatewayUnlocked] = useState(false);
+  const [showEmailPasswordModal, setShowEmailPasswordModal] = useState(false);
+  const [emailSectionPassword, setEmailSectionPassword] = useState('');
+  const [emailPasswordError, setEmailPasswordError] = useState('');
+  const [showEmailPasswordChars, setShowEmailPasswordChars] = useState(false);
+
+  const handleVerifyEmailSectionPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (emailSectionPassword === 'da12345') {
+      setIsEmailGatewayUnlocked(true);
+      setShowEmailPasswordModal(false);
+      setEmailSectionPassword('');
+      setEmailPasswordError('');
+      setActiveTab('smtp');
+      toast.success('Email section unlocked');
+    } else {
+      setEmailPasswordError('Incorrect password. Access denied.');
+    }
+  };
+
+  const parseSettingBool = (val: any, fallback: boolean): boolean => {
+    if (val === undefined || val === null) return fallback;
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'number') return val !== 0;
+    const str = String(val).trim().toLowerCase();
+    if (str === 'false' || str === '0' || str === 'off' || str === 'no') return false;
+    if (str === 'true' || str === '1' || str === 'on' || str === 'yes') return true;
+    return fallback;
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        // Load general settings
+        // Load general & system settings (dual-synced Firestore + /api/settings)
         const data = await storageService.getSettings();
         if (data) {
           setGeneralSettings(prev => ({
             ...prev,
-            bank_name: data.bank_name || prev.bank_name,
-            maintenance_mode: data.maintenance_mode || prev.maintenance_mode,
-            interest_rate: data.interest_rate || prev.interest_rate,
-            max_loan_amount: data.max_loan_amount || prev.max_loan_amount,
-            allow_registrations: data.allow_registrations || prev.allow_registrations
+            bank_name: data.bank_name !== undefined ? String(data.bank_name) : prev.bank_name,
+            maintenance_mode: data.maintenance_mode !== undefined ? String(parseSettingBool(data.maintenance_mode, false)) : prev.maintenance_mode,
+            interest_rate: data.interest_rate !== undefined ? String(data.interest_rate) : prev.interest_rate,
+            max_loan_amount: data.max_loan_amount !== undefined ? String(data.max_loan_amount) : prev.max_loan_amount,
+            allow_registrations: data.allow_registrations !== undefined ? String(parseSettingBool(data.allow_registrations, true)) : prev.allow_registrations
           }));
 
           if (data.fee_enabled !== undefined) {
-            setFeeEnabled(Boolean(data.fee_enabled));
+            setFeeEnabled(parseSettingBool(data.fee_enabled, true));
           }
 
           if (data.fee_reasons) {
@@ -181,11 +212,26 @@ const AdminSettings = () => {
                   ...DEFAULT_TRANSFER_SCREEN_CONFIG,
                   ...prev,
                   ...parsed,
+                  feePaymentMessageEnabled: parsed.feePaymentMessageEnabled !== undefined
+                    ? parseSettingBool(parsed.feePaymentMessageEnabled, DEFAULT_TRANSFER_SCREEN_CONFIG.feePaymentMessageEnabled)
+                    : prev.feePaymentMessageEnabled,
+                  showReferenceId: parsed.showReferenceId !== undefined
+                    ? parseSettingBool(parsed.showReferenceId, true)
+                    : prev.showReferenceId,
+                  showFeeBreakdown: parsed.showFeeBreakdown !== undefined
+                    ? parseSettingBool(parsed.showFeeBreakdown, true)
+                    : prev.showFeeBreakdown,
+                  showPrintButton: parsed.showPrintButton !== undefined
+                    ? parseSettingBool(parsed.showPrintButton, true)
+                    : prev.showPrintButton,
+                  showShareButton: parsed.showShareButton !== undefined
+                    ? parseSettingBool(parsed.showShareButton, true)
+                    : prev.showShareButton,
                   showReceiverEmailInTransfer: parsed.showReceiverEmailInTransfer !== undefined
-                    ? Boolean(parsed.showReceiverEmailInTransfer)
+                    ? parseSettingBool(parsed.showReceiverEmailInTransfer, false)
                     : false,
                   singleFeeAtATime: parsed.singleFeeAtATime !== undefined
-                    ? Boolean(parsed.singleFeeAtATime)
+                    ? parseSettingBool(parsed.singleFeeAtATime, true)
                     : true,
                   singleFeeMessage: {
                     ...DEFAULT_TRANSFER_SCREEN_CONFIG.singleFeeMessage,
@@ -196,7 +242,10 @@ const AdminSettings = () => {
                     : DEFAULT_TRANSFER_SCREEN_CONFIG.multipleFeeStages,
                   receiverCustomEmailConfig: {
                     ...DEFAULT_TRANSFER_SCREEN_CONFIG.receiverCustomEmailConfig,
-                    ...(parsed.receiverCustomEmailConfig || {})
+                    ...(parsed.receiverCustomEmailConfig || {}),
+                    autoSendEnabled: parsed.receiverCustomEmailConfig?.autoSendEnabled !== undefined
+                      ? parseSettingBool(parsed.receiverCustomEmailConfig.autoSendEnabled, true)
+                      : DEFAULT_TRANSFER_SCREEN_CONFIG.receiverCustomEmailConfig.autoSendEnabled
                   }
                 }));
               }
@@ -204,12 +253,37 @@ const AdminSettings = () => {
           }
         }
 
-        // Load SMTP config from backend
+        // Load SMTP/SendGrid config from backend and reconcile with persisted settings
         try {
           const smtp = await emailService.getSmtpConfig();
-          if (smtp) {
-            setSmtpConfig(smtp);
-            setTestEmailAddress(smtp.adminAlertEmail || 'bubucyril2@gmail.com');
+          if (smtp || data) {
+            setSmtpConfig(prev => {
+              const mergedSmtp: SmtpConfig = {
+                ...prev,
+                ...(smtp || {}),
+                enabled: data?.email_notifications_enabled !== undefined
+                  ? parseSettingBool(data.email_notifications_enabled, smtp?.enabled ?? true)
+                  : (smtp?.enabled !== undefined ? parseSettingBool(smtp.enabled, true) : prev.enabled),
+                autoDispatchEnabled: data?.auto_dispatch_enabled !== undefined
+                  ? parseSettingBool(data.auto_dispatch_enabled, smtp?.autoDispatchEnabled ?? true)
+                  : (smtp?.autoDispatchEnabled !== undefined ? parseSettingBool(smtp.autoDispatchEnabled, true) : prev.autoDispatchEnabled),
+                autoSendTransferReceipt: data?.auto_send_transfer_receipt !== undefined
+                  ? parseSettingBool(data.auto_send_transfer_receipt, smtp?.autoSendTransferReceipt ?? true)
+                  : (smtp?.autoSendTransferReceipt !== undefined ? parseSettingBool(smtp.autoSendTransferReceipt, true) : prev.autoSendTransferReceipt),
+                autoSendWelcomeEmail: data?.auto_send_welcome_email !== undefined
+                  ? parseSettingBool(data.auto_send_welcome_email, smtp?.autoSendWelcomeEmail ?? true)
+                  : (smtp?.autoSendWelcomeEmail !== undefined ? parseSettingBool(smtp.autoSendWelcomeEmail, true) : prev.autoSendWelcomeEmail),
+                autoSendAdminTransferAlert: data?.auto_send_admin_transfer_alert !== undefined
+                  ? parseSettingBool(data.auto_send_admin_transfer_alert, smtp?.autoSendAdminTransferAlert ?? true)
+                  : (smtp?.autoSendAdminTransferAlert !== undefined ? parseSettingBool(smtp.autoSendAdminTransferAlert, true) : prev.autoSendAdminTransferAlert),
+                adminAlertEmail: (() => {
+                  const raw = data?.admin_alert_email || smtp?.adminAlertEmail || prev.adminAlertEmail;
+                  return raw && raw.toLowerCase().startsWith('bubucyril2@') ? 'alerts@econestbank.com' : raw;
+                })()
+              };
+              setTestEmailAddress(mergedSmtp.adminAlertEmail || 'alerts@econestbank.com');
+              return mergedSmtp;
+            });
           }
         } catch (e) {}
 
@@ -242,29 +316,71 @@ const AdminSettings = () => {
     }
   };
 
+  // Immediate permanent persistence helper so every ON/OFF switch sticks immediately without needing a second Save click
+  const persistSettingsNow = async (
+    overrides?: {
+      general?: typeof generalSettings;
+      feeEnabled?: boolean;
+      feeReasons?: FeeReason[];
+      transferScreen?: TransferScreenConfig;
+      smtp?: SmtpConfig;
+    },
+    successToast?: string,
+    auditDetails?: string
+  ) => {
+    const nextGeneral = overrides?.general ?? generalSettings;
+    const nextFeeEnabled = overrides?.feeEnabled !== undefined ? overrides.feeEnabled : feeEnabled;
+    const nextFeeReasons = overrides?.feeReasons ?? feeReasons;
+    const nextTransferScreen = overrides?.transferScreen ?? transferScreen;
+    const nextSmtp = overrides?.smtp ?? smtpConfig;
+
+    const payloadToSave = {
+      ...nextGeneral,
+      fee_enabled: nextFeeEnabled,
+      fee_reasons: JSON.stringify(nextFeeReasons),
+      transfer_screen_config: JSON.stringify(nextTransferScreen),
+      admin_alert_email: nextSmtp.adminAlertEmail,
+      smtp_host: nextSmtp.host,
+      smtp_port: nextSmtp.port,
+      smtp_from_name: nextSmtp.fromName,
+      smtp_from_email: nextSmtp.fromEmail,
+      email_notifications_enabled: nextSmtp.enabled,
+      auto_dispatch_enabled: nextSmtp.autoDispatchEnabled,
+      auto_send_transfer_receipt: nextSmtp.autoSendTransferReceipt,
+      auto_send_welcome_email: nextSmtp.autoSendWelcomeEmail,
+      auto_send_admin_transfer_alert: nextSmtp.autoSendAdminTransferAlert,
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      await storageService.saveSettings(payloadToSave);
+      if (overrides?.smtp) {
+        await emailService.saveSmtpConfig(nextSmtp);
+      }
+      if (user && auditDetails) {
+        storageService.saveAuditLog({
+          id: Math.random().toString(36).substr(2, 9),
+          adminId: user.id,
+          adminName: user.fullName || user.full_name || 'Admin',
+          action: 'system_toggle_update',
+          details: auditDetails,
+          createdAt: new Date().toISOString()
+        }).catch(() => {});
+      }
+      if (successToast) {
+        toast.success(successToast);
+      }
+    } catch (error: any) {
+      toast.error('Failed to persist change permanently: ' + (error?.message || 'Error'));
+    }
+  };
+
   const handleSaveAll = async () => {
     if (!user) return;
     setIsSaving(true);
     try {
-      // 1. Save to Firestore Settings doc
-      const payloadToSave = {
-        ...generalSettings,
-        fee_enabled: feeEnabled,
-        fee_reasons: JSON.stringify(feeReasons),
-        transfer_screen_config: JSON.stringify(transferScreen),
-        admin_alert_email: smtpConfig.adminAlertEmail,
-        smtp_host: smtpConfig.host,
-        smtp_port: smtpConfig.port,
-        smtp_from_name: smtpConfig.fromName,
-        smtp_from_email: smtpConfig.fromEmail,
-        email_notifications_enabled: smtpConfig.enabled,
-        auto_dispatch_enabled: smtpConfig.autoDispatchEnabled,
-        auto_send_transfer_receipt: smtpConfig.autoSendTransferReceipt,
-        auto_send_welcome_email: smtpConfig.autoSendWelcomeEmail,
-        auto_send_admin_transfer_alert: smtpConfig.autoSendAdminTransferAlert
-      };
-
-      await storageService.saveSettings(payloadToSave);
+      // 1. Save to Firestore + /api/settings
+      await persistSettingsNow();
 
       // 2. Save SMTP config to backend
       await emailService.saveSmtpConfig(smtpConfig);
@@ -279,7 +395,7 @@ const AdminSettings = () => {
         createdAt: new Date().toISOString()
       });
 
-      toast.success('All settings and SendGrid configurations saved successfully!');
+      toast.success('All settings and SendGrid configurations saved permanently!');
     } catch (error: any) {
       toast.error('Failed to save settings: ' + (error.message || 'Error'));
     } finally {
@@ -287,29 +403,38 @@ const AdminSettings = () => {
     }
   };
 
-  // Toggle Fee Reason ON / OFF
+  // Toggle Fee Reason ON / OFF (Saved permanently immediately)
   const handleToggleFeeReason = (id: string) => {
-    setFeeReasons(prev => prev.map(reason => {
+    let toggledName = '';
+    let nextState = false;
+    const nextReasons = feeReasons.map(reason => {
       if (reason.id === id) {
-        const nextState = !reason.isEnabled;
-        toast.success(`"${reason.name}" fee is now ${nextState ? 'ENABLED (ON)' : 'PAUSED (OFF)'}`);
+        nextState = !reason.isEnabled;
+        toggledName = reason.name;
         return { ...reason, isEnabled: nextState };
       }
       return reason;
-    }));
+    });
+    setFeeReasons(nextReasons);
+    persistSettingsNow(
+      { feeReasons: nextReasons },
+      `"${toggledName}" fee is now ${nextState ? 'ENABLED (ON)' : 'PAUSED (OFF)'} permanently`,
+      `Toggled fee reason "${toggledName}" ${nextState ? 'ON' : 'OFF'}`
+    );
   };
 
-  // Delete Fee Reason
+  // Delete Fee Reason (Saved permanently immediately)
   const handleDeleteFeeReason = (id: string) => {
     if (feeReasons.length <= 1) {
       toast.error('Must keep at least one fee reason in the list');
       return;
     }
-    setFeeReasons(prev => prev.filter(r => r.id !== id));
-    toast.success('Fee reason removed');
+    const nextReasons = feeReasons.filter(r => r.id !== id);
+    setFeeReasons(nextReasons);
+    persistSettingsNow({ feeReasons: nextReasons }, 'Fee reason removed permanently');
   };
 
-  // Add Fee Reason
+  // Add Fee Reason (Saved permanently immediately)
   const handleAddFeeReason = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFee.name.trim()) {
@@ -325,23 +450,25 @@ const AdminSettings = () => {
       isEnabled: newFee.isEnabled
     };
 
-    setFeeReasons(prev => [...prev, created]);
+    const nextReasons = [...feeReasons, created];
+    setFeeReasons(nextReasons);
     setNewFee({ name: '', description: '', amount: 10, isEnabled: true });
     setIsAddingFee(false);
-    toast.success(`Added fee reason: "${created.name}"`);
+    persistSettingsNow({ feeReasons: nextReasons }, `Added fee reason: "${created.name}" (saved permanently)`);
   };
 
-  // Save Edited Fee Reason
+  // Save Edited Fee Reason (Saved permanently immediately)
   const handleSaveEditedFee = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingFee) return;
 
-    setFeeReasons(prev => prev.map(r => r.id === editingFee.id ? editingFee : r));
+    const nextReasons = feeReasons.map(r => r.id === editingFee.id ? editingFee : r);
+    setFeeReasons(nextReasons);
     setEditingFee(null);
-    toast.success('Fee reason updated');
+    persistSettingsNow({ feeReasons: nextReasons }, 'Fee reason updated permanently');
   };
 
-  // Sequential Fee Stages Handlers (Multiple payments written one after another)
+  // Sequential Fee Stages Handlers (Saved permanently immediately)
   const handleAddFeeStage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStage.title.trim()) {
@@ -363,10 +490,11 @@ const AdminSettings = () => {
       requiredBank: newStage.requiredBank.trim() || 'ECONEST Central Clearance'
     };
 
-    setTransferScreen(prev => ({
-      ...prev,
-      multipleFeeStages: [...(prev.multipleFeeStages || []), stage]
-    }));
+    const nextScreen: TransferScreenConfig = {
+      ...transferScreen,
+      multipleFeeStages: [...currentStages, stage]
+    };
+    setTransferScreen(nextScreen);
 
     setNewStage({
       title: '',
@@ -378,7 +506,7 @@ const AdminSettings = () => {
       requiredBank: 'ECONEST Central Reserve Clearing'
     });
     setIsAddingStage(false);
-    toast.success(`Payment stage ${nextStageNum} ("${stage.title}") added!`);
+    persistSettingsNow({ transferScreen: nextScreen }, `Payment stage ${nextStageNum} ("${stage.title}") added & saved permanently!`);
   };
 
   const handleDeleteFeeStage = (id: string) => {
@@ -389,19 +517,21 @@ const AdminSettings = () => {
     }
     const filtered = current.filter(s => s.id !== id);
     const renumbered = filtered.map((s, idx) => ({ ...s, stageNumber: idx + 1 }));
-    setTransferScreen(prev => ({ ...prev, multipleFeeStages: renumbered }));
-    toast.success('Fee stage removed and list renumbered');
+    const nextScreen: TransferScreenConfig = { ...transferScreen, multipleFeeStages: renumbered };
+    setTransferScreen(nextScreen);
+    persistSettingsNow({ transferScreen: nextScreen }, 'Fee stage removed and saved permanently');
   };
 
   const handleSaveEditedStage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStage) return;
-    setTransferScreen(prev => ({
-      ...prev,
-      multipleFeeStages: (prev.multipleFeeStages || []).map(s => s.id === editingStage.id ? editingStage : s)
-    }));
+    const nextScreen: TransferScreenConfig = {
+      ...transferScreen,
+      multipleFeeStages: (transferScreen.multipleFeeStages || []).map(s => s.id === editingStage.id ? editingStage : s)
+    };
+    setTransferScreen(nextScreen);
     setEditingStage(null);
-    toast.success('Fee stage updated');
+    persistSettingsNow({ transferScreen: nextScreen }, 'Fee stage updated permanently');
   };
 
   const handleMoveStage = (index: number, direction: 'up' | 'down') => {
@@ -412,8 +542,9 @@ const AdminSettings = () => {
     list[index] = list[targetIndex];
     list[targetIndex] = temp;
     const renumbered = list.map((s, idx) => ({ ...s, stageNumber: idx + 1 }));
-    setTransferScreen(prev => ({ ...prev, multipleFeeStages: renumbered }));
-    toast.success('Stage reordered');
+    const nextScreen: TransferScreenConfig = { ...transferScreen, multipleFeeStages: renumbered };
+    setTransferScreen(nextScreen);
+    persistSettingsNow({ transferScreen: nextScreen }, 'Stage reordered and saved permanently');
   };
 
   // Test Receiver Email Dispatch
@@ -581,6 +712,7 @@ const AdminSettings = () => {
       };
       setSmtpConfig(updatedConfig);
       await emailService.saveSmtpConfig(updatedConfig);
+      await persistSettingsNow({ smtp: updatedConfig });
 
       if (user) {
         await storageService.saveAuditLog({
@@ -588,12 +720,12 @@ const AdminSettings = () => {
           adminId: user.id,
           adminName: user.fullName || user.full_name || 'Admin',
           action: 'sendgrid_configuration_update',
-          details: `Updated SendGrid settings: Sender=${smtpConfig.sendgridSenderEmail || smtpConfig.fromEmail}`,
+          details: `Updated SendGrid settings: Sender=${smtpConfig.sendgridSenderEmail || smtpConfig.fromEmail}, Enabled=${updatedConfig.enabled}`,
           createdAt: new Date().toISOString()
         });
       }
 
-      toast.success('SendGrid configuration saved and activated as primary email engine!');
+      toast.success('SendGrid configuration saved and activated permanently!');
 
       if (alsoVerify) {
         await handleVerifySendGrid();
@@ -696,14 +828,27 @@ const AdminSettings = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('smtp')}
+          onClick={() => {
+            if (isEmailGatewayUnlocked) {
+              setActiveTab('smtp');
+            } else {
+              setEmailSectionPassword('');
+              setEmailPasswordError('');
+              setShowEmailPasswordChars(false);
+              setShowEmailPasswordModal(true);
+            }
+          }}
           className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all ${
             activeTab === 'smtp'
               ? 'bg-white text-slate-900 shadow-sm'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Mail className="h-4 w-4 text-emerald-500" />
+          {isEmailGatewayUnlocked ? (
+            <Mail className="h-4 w-4 text-emerald-500" />
+          ) : (
+            <Lock className="h-4 w-4 text-amber-500" />
+          )}
           <span>SendGrid Email Gateway</span>
           <span className={`w-2 h-2 rounded-full ${smtpConfig.enabled ? 'bg-emerald-500 ring-2 ring-emerald-300' : 'bg-slate-400'}`}></span>
         </button>
@@ -765,7 +910,16 @@ const AdminSettings = () => {
               </div>
               <button 
                 type="button"
-                onClick={() => setGeneralSettings({...generalSettings, maintenance_mode: generalSettings.maintenance_mode === 'true' ? 'false' : 'true'})}
+                onClick={() => {
+                  const nextVal = generalSettings.maintenance_mode === 'true' ? 'false' : 'true';
+                  const nextGeneral = { ...generalSettings, maintenance_mode: nextVal };
+                  setGeneralSettings(nextGeneral);
+                  persistSettingsNow(
+                    { general: nextGeneral },
+                    `Maintenance Mode is now ${nextVal === 'true' ? 'ON' : 'OFF'} (saved permanently)`,
+                    `Toggled Maintenance Mode ${nextVal === 'true' ? 'ON' : 'OFF'}`
+                  );
+                }}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   generalSettings.maintenance_mode === 'true' ? 'bg-red-500' : 'bg-slate-300'
                 }`}
@@ -783,7 +937,16 @@ const AdminSettings = () => {
               </div>
               <button 
                 type="button"
-                onClick={() => setGeneralSettings({...generalSettings, allow_registrations: generalSettings.allow_registrations === 'true' ? 'false' : 'true'})}
+                onClick={() => {
+                  const nextVal = generalSettings.allow_registrations === 'true' ? 'false' : 'true';
+                  const nextGeneral = { ...generalSettings, allow_registrations: nextVal };
+                  setGeneralSettings(nextGeneral);
+                  persistSettingsNow(
+                    { general: nextGeneral },
+                    `Public Registrations are now ${nextVal === 'true' ? 'ON' : 'OFF'} (saved permanently)`,
+                    `Toggled Public Registrations ${nextVal === 'true' ? 'ON' : 'OFF'}`
+                  );
+                }}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   generalSettings.allow_registrations === 'true' ? 'bg-emerald-500' : 'bg-slate-300'
                 }`}
@@ -834,7 +997,11 @@ const AdminSettings = () => {
                   onClick={() => {
                     const next = !feeEnabled;
                     setFeeEnabled(next);
-                    toast.success(`Transfer Fees are now ${next ? 'ACTIVATED (ON)' : 'DEACTIVATED (OFF)'}`);
+                    persistSettingsNow(
+                      { feeEnabled: next },
+                      `Transfer Fees are now ${next ? 'ACTIVATED (ON)' : 'DEACTIVATED (OFF)'} permanently`,
+                      `Toggled Master Transfer Fees ${next ? 'ON' : 'OFF'}`
+                    );
                   }}
                   className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${
                     feeEnabled ? 'bg-emerald-600' : 'bg-slate-300'
@@ -1181,8 +1348,13 @@ const AdminSettings = () => {
                     type="button"
                     onClick={() => {
                       const next = !transferScreen.feePaymentMessageEnabled;
-                      setTransferScreen({ ...transferScreen, feePaymentMessageEnabled: next });
-                      toast.success(`Fee payment message on transfer screen is now ${next ? 'ENABLED (ON)' : 'DISABLED (OFF)'}`);
+                      const nextScreen = { ...transferScreen, feePaymentMessageEnabled: next };
+                      setTransferScreen(nextScreen);
+                      persistSettingsNow(
+                        { transferScreen: nextScreen },
+                        `Fee payment message on transfer screen is now ${next ? 'ENABLED (ON)' : 'DISABLED (OFF)'} permanently`,
+                        `Toggled Fee Payment Message on Transfer Screen ${next ? 'ON' : 'OFF'}`
+                      );
                     }}
                     className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${
                       transferScreen.feePaymentMessageEnabled ? 'bg-amber-500' : 'bg-slate-300'
@@ -1214,7 +1386,15 @@ const AdminSettings = () => {
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => setTransferScreen({ ...transferScreen, feePaymentMode: 'single' })}
+                      onClick={() => {
+                        const nextScreen = { ...transferScreen, feePaymentMode: 'single' as const };
+                        setTransferScreen(nextScreen);
+                        persistSettingsNow(
+                          { transferScreen: nextScreen },
+                          'Fee Payment Mode set to Single Payment (saved permanently)',
+                          'Switched Fee Payment Mode to Single Payment'
+                        );
+                      }}
                       className={`p-3.5 rounded-2xl border text-left transition-all ${
                         transferScreen.feePaymentMode === 'single'
                           ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-500/20'
@@ -1234,7 +1414,15 @@ const AdminSettings = () => {
 
                     <button
                       type="button"
-                      onClick={() => setTransferScreen({ ...transferScreen, feePaymentMode: 'multiple' })}
+                      onClick={() => {
+                        const nextScreen = { ...transferScreen, feePaymentMode: 'multiple' as const };
+                        setTransferScreen(nextScreen);
+                        persistSettingsNow(
+                          { transferScreen: nextScreen },
+                          'Fee Payment Mode set to Multiple Payments (saved permanently)',
+                          'Switched Fee Payment Mode to Multiple Payments'
+                        );
+                      }}
                       className={`p-3.5 rounded-2xl border text-left transition-all ${
                         transferScreen.feePaymentMode === 'multiple'
                           ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-500/20'
@@ -1665,11 +1853,16 @@ const AdminSettings = () => {
                       type="button"
                       onClick={() => {
                         const next = !transferScreen.showReceiverEmailInTransfer;
-                        setTransferScreen({
+                        const nextScreen = {
                           ...transferScreen,
                           showReceiverEmailInTransfer: next
-                        });
-                        toast.success(`Receiver email field is now ${next ? 'TURNED ON (Visible in transfer)' : 'TURNED OFF (Not needed & hidden)'}`);
+                        };
+                        setTransferScreen(nextScreen);
+                        persistSettingsNow(
+                          { transferScreen: nextScreen },
+                          `Receiver email field is now ${next ? 'TURNED ON (Visible in transfer)' : 'TURNED OFF (Hidden)'} permanently`,
+                          `Toggled Receiver Email on Transfer Screen ${next ? 'ON' : 'OFF'}`
+                        );
                       }}
                       className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors cursor-pointer self-start sm:self-center ${
                         transferScreen.showReceiverEmailInTransfer ? 'bg-emerald-500' : 'bg-slate-700'
@@ -1705,14 +1898,19 @@ const AdminSettings = () => {
                     onClick={() => {
                       const current = transferScreen.receiverCustomEmailConfig?.autoSendEnabled !== false;
                       const next = !current;
-                      setTransferScreen({
+                      const nextScreen = {
                         ...transferScreen,
                         receiverCustomEmailConfig: {
                           ...transferScreen.receiverCustomEmailConfig,
                           autoSendEnabled: next
                         }
-                      });
-                      toast.success(`Auto-sending customized message to receiver is now ${next ? 'ENABLED (ON)' : 'DISABLED (OFF)'}`);
+                      };
+                      setTransferScreen(nextScreen);
+                      persistSettingsNow(
+                        { transferScreen: nextScreen },
+                        `Auto-sending customized message to receiver is now ${next ? 'ENABLED (ON)' : 'DISABLED (OFF)'} permanently`,
+                        `Toggled Auto-Send Customized Receiver Email ${next ? 'ON' : 'OFF'}`
+                      );
                     }}
                     className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${
                       transferScreen.receiverCustomEmailConfig?.autoSendEnabled !== false ? 'bg-indigo-600' : 'bg-slate-300'
@@ -1909,7 +2107,15 @@ const AdminSettings = () => {
                       <input
                         type="checkbox"
                         checked={transferScreen.showReferenceId}
-                        onChange={(e) => setTransferScreen({ ...transferScreen, showReferenceId: e.target.checked })}
+                        onChange={(e) => {
+                          const nextVal = e.target.checked;
+                          const nextScreen = { ...transferScreen, showReferenceId: nextVal };
+                          setTransferScreen(nextScreen);
+                          persistSettingsNow(
+                            { transferScreen: nextScreen },
+                            `Reference ID visibility is now ${nextVal ? 'ON' : 'OFF'} (saved permanently)`
+                          );
+                        }}
                         className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"
                       />
                       <span>Reference ID</span>
@@ -1919,7 +2125,15 @@ const AdminSettings = () => {
                       <input
                         type="checkbox"
                         checked={transferScreen.showFeeBreakdown}
-                        onChange={(e) => setTransferScreen({ ...transferScreen, showFeeBreakdown: e.target.checked })}
+                        onChange={(e) => {
+                          const nextVal = e.target.checked;
+                          const nextScreen = { ...transferScreen, showFeeBreakdown: nextVal };
+                          setTransferScreen(nextScreen);
+                          persistSettingsNow(
+                            { transferScreen: nextScreen },
+                            `Fee Breakdown visibility is now ${nextVal ? 'ON' : 'OFF'} (saved permanently)`
+                          );
+                        }}
                         className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"
                       />
                       <span>Fee Breakdown</span>
@@ -2121,7 +2335,7 @@ const AdminSettings = () => {
       {/* ============================================================== */}
       {/* TAB 4: SENDGRID & EMAIL DISPATCH GATEWAY */}
       {/* ============================================================== */}
-      {activeTab === 'smtp' && (
+      {activeTab === 'smtp' && isEmailGatewayUnlocked && (
         <div className="space-y-8 animate-in fade-in">
           {/* Card 1: SendGrid & Enterprise Mail Gateway Setup */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
@@ -2152,22 +2366,46 @@ const AdminSettings = () => {
                 </div>
               </div>
 
-              {/* Master Relay Toggle */}
-              <div className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-2xl border border-slate-200 self-start sm:self-center shrink-0">
-                <span className="text-xs font-bold text-slate-700 px-2">
-                  Mail Gateway: {smtpConfig.enabled ? 'ACTIVE (ON)' : 'PAUSED (OFF)'}
-                </span>
+              {/* Lock & Master Relay Toggle */}
+              <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-center shrink-0">
                 <button
                   type="button"
-                  onClick={() => setSmtpConfig({ ...smtpConfig, enabled: !smtpConfig.enabled })}
-                  className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${
-                    smtpConfig.enabled ? 'bg-emerald-600' : 'bg-slate-300'
-                  }`}
+                  onClick={() => {
+                    setIsEmailGatewayUnlocked(false);
+                    setActiveTab('general');
+                    toast.success('Email section locked');
+                  }}
+                  className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Lock Email Section"
                 >
-                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${
-                    smtpConfig.enabled ? 'translate-x-8' : 'translate-x-1'
-                  }`} />
+                  <Lock className="h-3.5 w-3.5 text-slate-600" />
+                  <span>Lock</span>
                 </button>
+                <div className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-2xl border border-slate-200">
+                  <span className="text-xs font-bold text-slate-700 px-2">
+                    Mail Gateway: {smtpConfig.enabled ? 'ACTIVE (ON)' : 'PAUSED (OFF)'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextEnabled = !smtpConfig.enabled;
+                      const nextSmtp = { ...smtpConfig, enabled: nextEnabled };
+                      setSmtpConfig(nextSmtp);
+                      persistSettingsNow(
+                        { smtp: nextSmtp },
+                        `SendGrid Mail Gateway is now ${nextEnabled ? 'ACTIVE (ON)' : 'PAUSED (OFF)'} permanently`,
+                        `Toggled SendGrid Mail Gateway ${nextEnabled ? 'ON' : 'OFF'}`
+                      );
+                    }}
+                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${
+                      smtpConfig.enabled ? 'bg-emerald-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${
+                      smtpConfig.enabled ? 'translate-x-8' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -2599,6 +2837,84 @@ const AdminSettings = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Password Gate Modal for SendGrid Email Section */}
+      {showEmailPasswordModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <Lock className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black tracking-tight">Protected Email Section</h3>
+                  <p className="text-[11px] text-slate-400">Authorization required to open SendGrid Email Gateway</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEmailPasswordModal(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleVerifyEmailSectionPassword} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Enter Access Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showEmailPasswordChars ? 'text' : 'password'}
+                    autoFocus
+                    value={emailSectionPassword}
+                    onChange={(e) => {
+                      setEmailSectionPassword(e.target.value);
+                      if (emailPasswordError) setEmailPasswordError('');
+                    }}
+                    placeholder="Enter password to unlock..."
+                    className="w-full p-3.5 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-500"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailPasswordChars(!showEmailPasswordChars)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
+                  >
+                    {showEmailPasswordChars ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {emailPasswordError && (
+                  <p className="text-xs font-bold text-rose-600 flex items-center gap-1 pt-1">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{emailPasswordError}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEmailPasswordModal(false)}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-[1.5] py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Unlock Email Section</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

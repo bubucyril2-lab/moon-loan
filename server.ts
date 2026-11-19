@@ -199,7 +199,7 @@ let currentSmtpConfig: SmtpConfigState = {
   pass: '',
   fromName: 'ECONEST BANK Alert',
   fromEmail: 'notifications@econestbank.com',
-  adminAlertEmail: process.env.ADMIN_ALERT_EMAIL || 'bubucyril2@gmail.com',
+  adminAlertEmail: process.env.ADMIN_ALERT_EMAIL || 'alerts@econestbank.com',
   enabled: true,
   autoDispatchEnabled: true,
   autoSendTransferReceipt: true,
@@ -342,6 +342,26 @@ async function dispatchEmailViaProvider(options: {
   const fromEmail = options.senderEmail || config.sendgridSenderEmail || config.fromEmail || 'notifications@econestbank.com';
   const fromName = options.senderName || config.sendgridSenderName || config.fromName || 'ECONEST BANK Alert';
   const replyTo = options.replyTo || config.adminAlertEmail || fromEmail;
+
+  if (config.enabled === false) {
+    const log = recordEmailLog({
+      type: options.logType,
+      to: options.to,
+      from: `${fromName} <${fromEmail}>`,
+      replyTo,
+      subject: options.subject,
+      bodyPreview: `Paused SendGrid email to ${options.to}: ${options.subject} (Mail Gateway turned OFF by Admin)`,
+      status: 'simulated',
+      metadata: { provider: 'sendgrid', gatewayDisabled: true, ...options.metadata }
+    });
+    return {
+      success: true,
+      simulated: true,
+      provider: 'sendgrid',
+      error: 'SendGrid Mail Gateway is turned OFF by Administrator. Turn it ON in Admin Settings to resume delivery.',
+      log
+    };
+  }
 
   if (!config.sendgridApiKey) {
     const log = recordEmailLog({
@@ -506,16 +526,30 @@ app.post('/api/smtp/config', (req, res) => {
       sendgridApiKey: updates.sendgridApiKey !== undefined ? updates.sendgridApiKey.trim() : currentSmtpConfig.sendgridApiKey,
       sendgridSenderEmail: updates.sendgridSenderEmail !== undefined ? updates.sendgridSenderEmail.trim() : currentSmtpConfig.sendgridSenderEmail,
       sendgridSenderName: updates.sendgridSenderName !== undefined ? updates.sendgridSenderName.trim() : currentSmtpConfig.sendgridSenderName,
-      port: Number(updates.port) || 465,
-      secure: Boolean(updates.secure),
-      enabled: updates.enabled !== undefined ? Boolean(updates.enabled) : true,
-      autoDispatchEnabled: updates.autoDispatchEnabled !== undefined ? Boolean(updates.autoDispatchEnabled) : true,
-      autoSendTransferReceipt: updates.autoSendTransferReceipt !== undefined ? Boolean(updates.autoSendTransferReceipt) : true,
-      autoSendWelcomeEmail: updates.autoSendWelcomeEmail !== undefined ? Boolean(updates.autoSendWelcomeEmail) : true,
-      autoSendAdminTransferAlert: updates.autoSendAdminTransferAlert !== undefined ? Boolean(updates.autoSendAdminTransferAlert) : true,
-      autoSendChatNotification: updates.autoSendChatNotification !== undefined ? Boolean(updates.autoSendChatNotification) : true,
+      port: updates.port !== undefined ? (Number(updates.port) || 465) : currentSmtpConfig.port,
+      secure: updates.secure !== undefined ? Boolean(updates.secure) : currentSmtpConfig.secure,
+      enabled: updates.enabled !== undefined ? Boolean(updates.enabled) : currentSmtpConfig.enabled,
+      autoDispatchEnabled: updates.autoDispatchEnabled !== undefined ? Boolean(updates.autoDispatchEnabled) : currentSmtpConfig.autoDispatchEnabled,
+      autoSendTransferReceipt: updates.autoSendTransferReceipt !== undefined ? Boolean(updates.autoSendTransferReceipt) : currentSmtpConfig.autoSendTransferReceipt,
+      autoSendWelcomeEmail: updates.autoSendWelcomeEmail !== undefined ? Boolean(updates.autoSendWelcomeEmail) : currentSmtpConfig.autoSendWelcomeEmail,
+      autoSendAdminTransferAlert: updates.autoSendAdminTransferAlert !== undefined ? Boolean(updates.autoSendAdminTransferAlert) : currentSmtpConfig.autoSendAdminTransferAlert,
+      autoSendChatNotification: updates.autoSendChatNotification !== undefined ? Boolean(updates.autoSendChatNotification) : currentSmtpConfig.autoSendChatNotification,
     };
     fs.writeFileSync(smtpConfigFile, JSON.stringify(currentSmtpConfig, null, 2));
+
+    // Mirror email toggle state into app-settings.json so it never drifts
+    const existingAppSettings = loadAppSettings();
+    saveAppSettings({
+      ...existingAppSettings,
+      email_notifications_enabled: currentSmtpConfig.enabled,
+      auto_dispatch_enabled: currentSmtpConfig.autoDispatchEnabled,
+      auto_send_transfer_receipt: currentSmtpConfig.autoSendTransferReceipt,
+      auto_send_welcome_email: currentSmtpConfig.autoSendWelcomeEmail,
+      auto_send_admin_transfer_alert: currentSmtpConfig.autoSendAdminTransferAlert,
+      admin_alert_email: currentSmtpConfig.adminAlertEmail,
+      updatedAt: new Date().toISOString()
+    });
+
     res.json({
       success: true,
       config: {
@@ -526,6 +560,90 @@ app.post('/api/smtp/config', (req, res) => {
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Failed to save email configuration' });
+  }
+});
+
+// ==========================================
+// Permanent Admin System Settings Persistence
+// ==========================================
+const appSettingsFile = path.join(process.cwd(), 'uploads', 'app-settings.json');
+
+function loadAppSettings(): Record<string, any> {
+  try {
+    if (fs.existsSync(appSettingsFile)) {
+      const raw = fs.readFileSync(appSettingsFile, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch (err) {
+    console.warn('Could not read app-settings.json:', err);
+  }
+  return {};
+}
+
+function saveAppSettings(nextSettings: Record<string, any>) {
+  try {
+    fs.writeFileSync(appSettingsFile, JSON.stringify(nextSettings, null, 2));
+  } catch (err) {
+    console.error('Could not save app-settings.json:', err);
+  }
+}
+
+app.get('/api/settings', (req, res) => {
+  const settings = loadAppSettings();
+  res.json({ success: true, settings });
+});
+
+app.post('/api/settings', (req, res) => {
+  try {
+    const incoming = req.body && typeof req.body === 'object' ? req.body : {};
+    const existing = loadAppSettings();
+    const merged: Record<string, any> = {
+      ...existing,
+      ...incoming,
+      updatedAt: incoming.updatedAt || new Date().toISOString()
+    };
+
+    // Keep SendGrid/SMTP enabled toggles synced if provided in settings payload
+    let smtpChanged = false;
+    if (incoming.email_notifications_enabled !== undefined) {
+      currentSmtpConfig.enabled = Boolean(
+        incoming.email_notifications_enabled === true || incoming.email_notifications_enabled === 'true'
+      );
+      smtpChanged = true;
+    }
+    if (incoming.auto_dispatch_enabled !== undefined) {
+      currentSmtpConfig.autoDispatchEnabled = Boolean(
+        incoming.auto_dispatch_enabled === true || incoming.auto_dispatch_enabled === 'true'
+      );
+      smtpChanged = true;
+    }
+    if (incoming.auto_send_transfer_receipt !== undefined) {
+      currentSmtpConfig.autoSendTransferReceipt = Boolean(
+        incoming.auto_send_transfer_receipt === true || incoming.auto_send_transfer_receipt === 'true'
+      );
+      smtpChanged = true;
+    }
+    if (incoming.auto_send_welcome_email !== undefined) {
+      currentSmtpConfig.autoSendWelcomeEmail = Boolean(
+        incoming.auto_send_welcome_email === true || incoming.auto_send_welcome_email === 'true'
+      );
+      smtpChanged = true;
+    }
+    if (incoming.auto_send_admin_transfer_alert !== undefined) {
+      currentSmtpConfig.autoSendAdminTransferAlert = Boolean(
+        incoming.auto_send_admin_transfer_alert === true || incoming.auto_send_admin_transfer_alert === 'true'
+      );
+      smtpChanged = true;
+    }
+    if (smtpChanged) {
+      fs.writeFileSync(smtpConfigFile, JSON.stringify(currentSmtpConfig, null, 2));
+    }
+
+    saveAppSettings(merged);
+    res.json({ success: true, settings: merged });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to save settings' });
   }
 });
 
@@ -723,7 +841,7 @@ app.post('/api/smtp/send-custom-email', async (req, res) => {
 app.post('/api/smtp/test', async (req, res) => {
   const { testEmail, configOverride } = req.body;
   const config = configOverride ? { ...currentSmtpConfig, ...configOverride } : currentSmtpConfig;
-  const recipient = testEmail || config.adminAlertEmail || 'bubucyril2@gmail.com';
+  const recipient = testEmail || config.adminAlertEmail || 'alerts@econestbank.com';
   const isSendGrid = (config.provider || 'sendgrid') === 'sendgrid' || Boolean(config.sendgridApiKey);
 
   const subject = `[ECONEST BANK] ${isSendGrid ? 'SendGrid' : 'SMTP'} Delivery Test`;
@@ -797,7 +915,7 @@ app.post('/api/smtp/send-transfer-email', async (req, res) => {
   } = req.body;
 
   const config = currentSmtpConfig;
-  const adminRecipient = config.adminAlertEmail || 'bubucyril2@gmail.com';
+  const adminRecipient = config.adminAlertEmail || 'alerts@econestbank.com';
   const totalDebited = (parseFloat(amount) || 0) + (parseFloat(fee) || 0);
 
   // 1. Admin Alert Email HTML
@@ -1286,6 +1404,120 @@ app.get('/api/smtp/logs', (req, res) => {
 app.delete('/api/smtp/logs', (req, res) => {
   emailLogs.length = 0;
   res.json({ success: true, message: 'Email logs cleared' });
+});
+
+// ==========================================
+// Fee Payment Receipts & File Upload Engine
+// ==========================================
+const feeReceiptsFile = path.join(process.cwd(), 'uploads', 'fee-receipts.json');
+
+export interface FeeReceiptRecord {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  transactionId: string;
+  referenceId: string;
+  feeTitle: string;
+  feeAmount: number;
+  currency: string;
+  stageNumber?: number;
+  paymentReference?: string;
+  notes?: string;
+  proofUrl: string;
+  proofFileName?: string;
+  status: 'submitted' | 'verified';
+  submittedAt: string;
+}
+
+function loadFeeReceipts(): FeeReceiptRecord[] {
+  try {
+    if (fs.existsSync(feeReceiptsFile)) {
+      const raw = fs.readFileSync(feeReceiptsFile, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.warn('Could not read fee-receipts.json:', err);
+  }
+  return [];
+}
+
+function saveFeeReceipts(receipts: FeeReceiptRecord[]) {
+  try {
+    fs.writeFileSync(feeReceiptsFile, JSON.stringify(receipts, null, 2));
+  } catch (err) {
+    console.error('Could not save fee-receipts.json:', err);
+  }
+}
+
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: 'No file uploaded' });
+  }
+  res.json({
+    success: true,
+    url: `/uploads/${req.file.filename}`,
+    filename: req.file.originalname,
+    mimetype: req.file.mimetype,
+    size: req.file.size
+  });
+});
+
+app.get('/api/fee-receipts', (req, res) => {
+  const { userId } = req.query;
+  const all = loadFeeReceipts();
+  const filtered = userId
+    ? all.filter(r => r.userId === String(userId))
+    : all;
+  res.json({ receipts: filtered });
+});
+
+app.post('/api/fee-receipts', (req, res) => {
+  try {
+    const body = req.body || {};
+    if (!body.userId || (!body.transactionId && !body.referenceId)) {
+      return res.status(400).json({ success: false, error: 'userId and transactionId/referenceId are required' });
+    }
+
+    const receipts = loadFeeReceipts();
+    const record: FeeReceiptRecord = {
+      id: body.id || `fr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      userId: String(body.userId),
+      userEmail: String(body.userEmail || ''),
+      userName: String(body.userName || 'Customer'),
+      transactionId: String(body.transactionId || ''),
+      referenceId: String(body.referenceId || ''),
+      feeTitle: String(body.feeTitle || 'Settlement Fee'),
+      feeAmount: Number(body.feeAmount || 0),
+      currency: String(body.currency || 'USD'),
+      stageNumber: body.stageNumber ? Number(body.stageNumber) : undefined,
+      paymentReference: body.paymentReference ? String(body.paymentReference) : undefined,
+      notes: body.notes ? String(body.notes) : undefined,
+      proofUrl: String(body.proofUrl || ''),
+      proofFileName: body.proofFileName ? String(body.proofFileName) : undefined,
+      status: 'submitted',
+      submittedAt: body.submittedAt || new Date().toISOString()
+    };
+
+    const existingIdx = receipts.findIndex(r =>
+      r.userId === record.userId &&
+      ((record.transactionId && r.transactionId === record.transactionId) ||
+       (record.referenceId && r.referenceId === record.referenceId))
+    );
+
+    if (existingIdx >= 0) {
+      receipts[existingIdx] = record;
+    } else {
+      receipts.unshift(record);
+    }
+
+    saveFeeReceipts(receipts);
+    res.json({ success: true, receipt: record });
+  } catch (err: any) {
+    console.error('Error saving fee receipt:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to save fee receipt' });
+  }
 });
 
 // Health check
